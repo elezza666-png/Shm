@@ -157,7 +157,7 @@
       <div>
         <div class="logo-text">إدارة التبرعات</div>
         <div class="logo-sub" style="display: flex; align-items: center; gap: 5px;">
-          السحابي برو <span id="firebase-status">جاري التحميل...</span>
+          السحابي برو <span id="firebase-status">محلي 🟡</span>
         </div>
       </div>
     </div>
@@ -193,7 +193,7 @@
   </div>
   <div class="card">
     <div class="card-title">🎯 اختر مشروعاً للعمل عليه</div>
-    <div class="projects-grid" id="home-projects-grid"><div class="empty"><div class="empty-icon">⏳</div><div class="empty-text">جاري التحميل...</div></div></div>
+    <div class="projects-grid" id="home-projects-grid"><div class="empty"><div class="empty-icon">📋</div><div class="empty-text">لا توجد مشاريع بعد</div></div></div>
   </div>
   
   <div id="project-actions" style="display:none;">
@@ -598,72 +598,77 @@ function loadDB() {
   if (document.getElementById('don-date')) document.getElementById('don-date').value = today;
   if (document.getElementById('exp-date')) document.getElementById('exp-date').value = today;
 
-  // ① عرض البيانات المحلية فوراً بدون أي انتظار
+  // ① الصفحة تفتح فوراً من البيانات المحلية — بدون أي انتظار
   renderAll();
-  setStatus('محلي 🟡', true);
 
-  // ② تحميل Firebase SDK ديناميكياً بعد ما الصفحة تظهر
-  loadFirebaseSDK();
+  // ② Firebase في الخلفية تماماً — لا يؤثر على الواجهة أبداً
+  // نستخدم requestIdleCallback لو متاح، وإلا setTimeout طويل
+  const runInBackground = window.requestIdleCallback
+    ? cb => requestIdleCallback(cb, { timeout: 3000 })
+    : cb => setTimeout(cb, 800);
+
+  runInBackground(() => _connectFirebase());
 }
 
-function loadFirebaseSDK() {
-  // لو Firebase محمل بالفعل شغّله مباشرة
-  if (typeof firebase !== 'undefined' && firebase.app) {
-    initFirebaseConnection();
-    return;
+function _connectFirebase() {
+  // تحميل SDK ديناميكياً — لو فشل ما يوقفش أي حاجة
+  if (typeof firebase !== 'undefined' && typeof firebase.database === 'function') {
+    _initFB(); return;
   }
 
-  setStatus('جاري الاتصال...', true);
+  function loadScript(src, onOk) {
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.onload = onOk;
+    s.onerror = () => setStatus('بدون إنترنت 🔴', true);
+    document.head.appendChild(s);
+  }
 
-  // تحميل firebase-app أولاً
-  const s1 = document.createElement('script');
-  s1.src = 'https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js';
-  s1.onload = () => {
-    // بعد ما firebase-app يتحمل، حمّل firebase-database
-    const s2 = document.createElement('script');
-    s2.src = 'https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js';
-    s2.onload = () => {
-      // الاتنين اتحملوا — ابدأ الاتصال
-      initFirebaseConnection();
-    };
-    s2.onerror = () => setStatus('خطأ تحميل SDK 🔴', true);
-    document.head.appendChild(s2);
-  };
-  s1.onerror = () => setStatus('لا إنترنت 🔴', true);
-  document.head.appendChild(s1);
+  loadScript('https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js', () => {
+    loadScript('https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js', _initFB);
+  });
 }
 
-function initFirebaseConnection() {
+function _initFB() {
   try {
     if (!fbInitialized) {
       if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
       fbInitialized = true;
     }
 
-    // حالة الاتصال
+    // مراقبة الاتصال — فقط للعرض
     firebase.database().ref('.info/connected').on('value', snap => {
-      setStatus(snap.val() === true ? 'متصل 🟢' : 'غير متصل 🟡', snap.val() !== true);
+      setStatus(snap.val() ? 'متصل 🟢' : 'محلي 🟡', !snap.val());
     });
 
-    // استقبال البيانات
-    firebase.database().ref('charity_db').on('value', snapshot => {
-      const data = snapshot.val();
-      if (data && (data.donors || data.projects || data.transactions)) {
-        db.donors       = Array.isArray(data.donors)       ? data.donors       : [];
-        db.projects     = Array.isArray(data.projects)     ? data.projects     : [];
-        db.transactions = Array.isArray(data.transactions) ? data.transactions : [];
+    // البيانات — تحديث صامت في الخلفية
+    firebase.database().ref('charity_db').on('value', snap => {
+      const data = snap.val();
+      if (!data) return;
+      let changed = false;
+      if (Array.isArray(data.donors))       { db.donors       = data.donors;       changed = true; }
+      if (Array.isArray(data.projects))     { db.projects     = data.projects;     changed = true; }
+      if (Array.isArray(data.transactions)) { db.transactions = data.transactions; changed = true; }
+      if (data.qard) {
+        db.qard = {
+          deposits: Array.isArray(data.qard.deposits) ? data.qard.deposits : [],
+          loans:    Array.isArray(data.qard.loans)    ? data.qard.loans    : []
+        };
+        changed = true;
+      }
+      if (changed) {
         try { localStorage.setItem('charity_db_v5', JSON.stringify(db)); } catch(e) {}
         renderAll();
-        setStatus('متصل 🟢', false);
       }
     }, err => {
-      console.error('Firebase read error:', err);
-      setStatus('خطأ قراءة 🔴', true);
+      console.warn('FB read:', err.message);
+      setStatus('محلي 🟡', true);
     });
 
-  } catch (err) {
-    console.error('Firebase init error:', err);
-    setStatus('محلي فقط 🟡', true);
+  } catch(e) {
+    console.warn('FB init:', e.message);
+    setStatus('محلي 🟡', true);
   }
 }
 
