@@ -231,6 +231,7 @@
         <div class="card-title">💸 تسجيل مصروف</div>
         <div class="form-grid">
           <div class="form-group"><label>البيان *</label><input type="text" id="exp-desc" placeholder="وصف المصروف"></div>
+          <div class="form-group"><label>🏠 الحالة (اختياري)</label><select id="exp-case" style="padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-family:Cairo,sans-serif;font-size:14px;width:100%;"><option value="">-- بدون حالة --</option></select></div>
           <div class="form-group"><label>المبلغ (جنيه) *</label><input type="number" id="exp-amount" placeholder="0.00" min="1"></div>
           <div class="form-group"><label>التاريخ *</label><input type="date" id="exp-date"></div>
           <div class="form-group"><label>ملاحظات</label><input type="text" id="exp-notes" placeholder="ملاحظات اختيارية"></div>
@@ -294,29 +295,53 @@
 
 <!-- PROJECTS PAGE -->
 <div class="page" id="page-projects">
-  <div class="page-title">
-      <div class="page-title-text">📋 إدارة المشاريع والأرشيف</div>
+  <div class="page-title"><div class="page-title-text">📋 الصناديق والحالات</div></div>
+  <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border);">
+    <div id="ptab-projects" onclick="switchProjectsTab('projects')" style="padding:10px 22px;cursor:pointer;font-weight:700;font-size:14px;color:var(--primary);border-bottom:3px solid var(--primary);margin-bottom:-2px;">📋 الصناديق</div>
+    <div id="ptab-cases" onclick="switchProjectsTab('cases')" style="padding:10px 22px;cursor:pointer;font-weight:700;font-size:14px;color:var(--text-muted);border-bottom:3px solid transparent;margin-bottom:-2px;">🏠 الحالات</div>
   </div>
-  <div class="card">
-    <div class="card-title">➕ إضافة مشروع جديد</div>
-    <div class="form-grid">
-      <div class="form-group"><label>اسم المشروع *</label><input type="text" id="proj-name" placeholder="اسم المشروع"></div>
-      <div class="form-group"><label>رصيد أول المدة (جنيه)</label><input type="number" id="proj-opening" placeholder="0.00" min="0" value="0"></div>
-      <div class="form-group span2"><label>وصف المشروع</label><textarea id="proj-desc" placeholder="وصف تفصيلي..."></textarea></div>
-      <div class="form-group span2" style="flex-direction:row; align-items:center; gap:8px;">
+  <div id="tab-projects-content">
+    <div class="card">
+      <div class="card-title">➕ إضافة مشروع جديد</div>
+      <div class="form-grid">
+        <div class="form-group"><label>اسم المشروع *</label><input type="text" id="proj-name" placeholder="اسم المشروع"></div>
+        <div class="form-group"><label>رصيد أول المدة (جنيه)</label><input type="number" id="proj-opening" placeholder="0.00" min="0" value="0"></div>
+        <div class="form-group span2"><label>وصف المشروع</label><textarea id="proj-desc" placeholder="وصف تفصيلي..."></textarea></div>
+        <div class="form-group span2" style="flex-direction:row;align-items:center;gap:8px;">
           <input type="checkbox" id="proj-private">
-          <label style="margin:0; cursor:pointer;" for="proj-private">🔒 مشروع خاص (يخفى من تقرير المشاريع العام)</label>
+          <label style="margin:0;cursor:pointer;" for="proj-private">🔒 مشروع خاص (يُخفى من التقارير العامة)</label>
+        </div>
+      </div>
+      <div style="margin-top:16px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="saveProject()">✅ إضافة المشروع</button></div>
+    </div>
+    <div class="card" style="padding:0;">
+      <div style="padding:18px;"><div class="card-title" style="margin:0;">📋 قائمة المشاريع</div></div>
+      <div class="table-wrap" style="border:none;border-radius:0 0 16px 16px;border-top:1px solid var(--border);">
+        <table>
+          <thead><tr><th>الحالة</th><th>المشروع</th><th>رصيد أول</th><th>الرصيد الحالي</th><th>إجراءات</th></tr></thead>
+          <tbody id="projects-table-body"><tr><td colspan="5"><div class="empty"><div class="empty-icon">⏳</div></div></td></tr></tbody>
+        </table>
       </div>
     </div>
-    <div style="margin-top:16px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="saveProject()">✅ إضافة المشروع</button></div>
   </div>
-  <div class="card" style="padding:0;">
-    <div style="padding:18px;"><div class="card-title" style="margin:0;">📋 قائمة المشاريع (الفعالة والمؤرشفة)</div></div>
-    <div class="table-wrap" style="border:none;border-radius:0 0 16px 16px;border-top:1px solid var(--border);">
-      <table>
-        <thead><tr><th>الحالة</th><th>المشروع</th><th>رصيد أول</th><th>الرصيد الحالي</th><th>إجراءات</th></tr></thead>
-        <tbody id="projects-table-body"><tr><td colspan="5"><div class="empty"><div class="empty-icon">⏳</div></div></td></tr></tbody>
-      </table>
+  <div id="tab-cases-content" style="display:none;">
+    <div class="card">
+      <div class="card-title">➕ إضافة حالة جديدة</div>
+      <div class="form-grid">
+        <div class="form-group"><label>كود الحالة *</label><input type="text" id="case-code" placeholder="C-001" dir="ltr" style="text-transform:uppercase;"></div>
+        <div class="form-group"><label>اسم الحالة *</label><input type="text" id="case-name" placeholder="اسم الحالة أو الشخص"></div>
+        <div class="form-group span2"><label>ملاحظات</label><input type="text" id="case-notes" placeholder="عنوان، تفاصيل..."></div>
+      </div>
+      <div style="margin-top:16px;display:flex;justify-content:flex-end;"><button class="btn btn-accent" onclick="saveCase()">➕ إضافة الحالة</button></div>
+    </div>
+    <div class="card" style="padding:0;">
+      <div style="padding:18px;"><div class="card-title" style="margin:0;">🏠 قائمة الحالات</div></div>
+      <div class="table-wrap" style="border:none;border-radius:0 0 16px 16px;border-top:1px solid var(--border);">
+        <table>
+          <thead><tr><th>الكود</th><th>الاسم</th><th>إجمالي الصرف</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
+          <tbody id="cases-table-body"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
@@ -561,7 +586,7 @@ const firebaseConfig = {
 };
 
 const WA_GROUP_LINK='https://chat.whatsapp.com/KQxUlARMPbWCdjFn6d3XKC';
-let db = { donors:[], projects:[], transactions:[], qard:{ deposits:[], loans:[] } };
+let db = { donors:[], projects:[], transactions:[], cases:[], qard:{ deposits:[], loans:[] } };
 let selectedProject = null;
 let currentWaPhone = '';
 let currentWaMessage = '';
@@ -585,6 +610,7 @@ try {
       db.donors       = parsed.donors       || [];
       db.projects     = parsed.projects     || [];
       db.transactions = parsed.transactions || [];
+      if (Array.isArray(parsed.cases)) db.cases = parsed.cases;
       if (parsed.qard) {
         db.qard = {
           deposits: Array.isArray(parsed.qard.deposits) ? parsed.qard.deposits : [],
@@ -713,6 +739,7 @@ async function saveDB() {
       donors:       db.donors       || [],
       projects:     db.projects     || [],
       transactions: db.transactions || [],
+      cases:        db.cases        || [],
       qard: {
         deposits: db.qard?.deposits || [],
         loans:    db.qard?.loans    || []
@@ -793,7 +820,20 @@ function toast(msg, type='') {
 }
 function formatDate(d){if(!d)return'-';const p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
 function getGenderLabel(g) { if(g==='M') return 'الأستاذ'; if(g==='F') return 'الأستاذة'; if(g==='C') return 'جهة/شركة'; return 'الأستاذ(ة)'; }
-function getPrivacyDesc(t) { if(t.type === 'expense' || t.donorId === 'general') return t.desc; const d = db.donors.find(x=>x.id === t.donorId); if(d) return `مساهمة ◀ كود: ${d.code}`; return t.desc; }
+function getPrivacyDesc(t) {
+  if(t.type === 'expense') {
+    // لو فيه حالة، اعرض كودها في البيان
+    if(t.caseId) {
+      const c = db.cases ? db.cases.find(x=>String(x.id)===String(t.caseId)) : null;
+      if(c) return t.desc.replace('['+c.code+']','').trim() + ' [' + c.code + ']';
+    }
+    return t.desc;
+  }
+  if(t.donorId === 'general') return t.desc;
+  const d = db.donors.find(x=>x.id === t.donorId);
+  if(d) return 'مساهمة ◀ كود: ' + d.code;
+  return t.desc;
+}
 
 // ==========================================
 // 5. المتبرعون ومربع البحث والتذكير الذكي
@@ -1046,9 +1086,14 @@ async function saveDonation(){
 async function saveExpense(){
   if(!selectedProject) return toast('⚠️ اختر مشروعاً','error');
   const desc=document.getElementById('exp-desc').value.trim(), amount=parseFloat(document.getElementById('exp-amount').value), date=document.getElementById('exp-date').value, notes=document.getElementById('exp-notes').value.trim();
+  const caseId=document.getElementById('exp-case')?.value||'';
+  const caseObj=caseId?db.cases.find(c=>c.id==caseId):null;
   if(!desc||!amount||amount<=0) return toast('⚠️ أكمل البيانات','error');
-  db.transactions.push({id:Date.now(), type:'expense', projectId:selectedProject.id, amount, date, notes, desc}); await saveDB();
-  document.getElementById('exp-desc').value=''; document.getElementById('exp-amount').value=''; document.getElementById('exp-notes').value=''; toast('✅ تم تسجيل المصروف','success');
+  const fullDesc = caseObj ? desc+' ['+caseObj.code+']' : desc;
+  db.transactions.push({id:Date.now(), type:'expense', projectId:selectedProject.id, amount, date, notes, desc:fullDesc, caseId}); await saveDB();
+  document.getElementById('exp-desc').value=''; document.getElementById('exp-amount').value=''; document.getElementById('exp-notes').value='';
+  if(document.getElementById('exp-case')) document.getElementById('exp-case').value='';
+  toast('✅ تم تسجيل المصروف','success');
 }
 
 function openEditTx(id) {
@@ -1116,9 +1161,10 @@ function renderAll() {
   renderDonorsTable(); 
   renderProjectsTable(); 
   renderHomePage(); 
+  populateCaseSelect();
   if(selectedProject && document.getElementById('tab-statement').classList.contains('active')) renderStatement();
-  // القرض الحسن - تحديث لو الصفحة مفتوحة
-  if(document.getElementById('page-qard') && document.getElementById('page-qard').classList.contains('active')) renderQardPage();
+  if(document.getElementById('page-qard')?.classList.contains('active')) renderQardPage();
+  if(document.getElementById('tab-cases-content')?.style.display==='block') renderCasesTable();
 }
 
 function showWhatsAppModal(donor, amount, date, project, currentTxId){
@@ -1907,7 +1953,7 @@ function generateDonorCardReport() {
   // اعرض قائمة لاختيار المساهم
   const list=db.donors.map(d=>{
     const total=db.transactions.filter(t=>t.type==='donation'&&t.donorId===d.id).reduce((s,t)=>s+t.amount,0);
-    return `<div onclick="drawDonorCard(${d.id})" style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background .15s;" onmouseover="this.style.background='#f0f7f0'" onmouseout="this.style.background=''">
+    return `<div onclick="drawDonorCard('${d.id}')" style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background .15s;" onmouseover="this.style.background='#f0f7f0'" onmouseout="this.style.background=''">
       <div><strong style="color:var(--primary);">${d.name}</strong> <span style="font-size:12px;color:#777;">(${d.code})</span></div>
       <span style="color:var(--success);font-weight:700;">${total.toLocaleString('ar-EG')} ج</span>
     </div>`;
@@ -1920,17 +1966,18 @@ function generateDonorCardReport() {
 }
 
 function drawDonorCard(donorId) {
-  // غلق أي modal بحث مفتوح
   document.getElementById('donor-card-pick')?.remove();
   document.getElementById('donor-card-search-modal')?.remove();
-  const donor=db.donors.find(d=>d.id===donorId);
-  if(!donor) return;
-  const txns=db.transactions.filter(t=>t.type==='donation'&&t.donorId===donorId).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  // مقارنة == بدل === عشان نتجنب string vs number
+  const donor=db.donors.find(d=>d.id==donorId);
+  if(!donor){ toast('⚠️ لم يُعثر على المساهم','error'); return; }
+  const privateIds=new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
+  const txns=db.transactions.filter(t=>t.type==='donation'&&t.donorId==donorId&&!privateIds.has(t.projectId)).sort((a,b)=>new Date(a.date)-new Date(b.date));
   const total=txns.reduce((s,t)=>s+t.amount,0);
   const count=txns.length;
   const firstDate=txns.length?txns[0].date:'';
   const lastDate=txns.length?txns[txns.length-1].date:'';
-  const overallTotal=db.transactions.filter(t=>t.type==='donation').reduce((s,t)=>s+t.amount,0);
+  const overallTotal=db.transactions.filter(t=>t.type==='donation'&&!privateIds.has(t.projectId)).reduce((s,t)=>s+t.amount,0);
   const pct=overallTotal>0?Math.round(total/overallTotal*100):0;
 
   // آخر 6 شهور لهذا المساهم
