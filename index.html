@@ -181,9 +181,8 @@
         <button class="btn btn-info btn-sm" onclick="exportActiveProjectsImage()">📸 المشاريع الفعالة</button>
         <button class="btn btn-accent btn-sm" onclick="generateTopDonorsReport()">🏆 أبطال التبرع</button>
         <button class="btn btn-success btn-sm" onclick="generateMonthlyTrendReport()">📈 منحنى النمو</button>
-        <button class="btn btn-warn btn-sm" onclick="openDonorCardSearch()">💳 بطاقة مساهم</button>
-        <button class="btn btn-outline btn-sm" onclick="generateGroupMessage(0)">📢 رسالة هذا الشهر</button>
-        <button class="btn btn-outline btn-sm" onclick="generateGroupMessage(1)">📢 رسالة الشهر السابق</button>
+        <button class="btn btn-warn btn-sm" onclick="generateDonorCardReport()">💳 بطاقة مساهم</button>
+        <button class="btn btn-outline btn-sm" onclick="generateGroupMessage()">📢 رسالة الجروب</button>
     </div>
   </div>
   
@@ -231,7 +230,6 @@
         <div class="card-title">💸 تسجيل مصروف</div>
         <div class="form-grid">
           <div class="form-group"><label>البيان *</label><input type="text" id="exp-desc" placeholder="وصف المصروف"></div>
-          <div class="form-group"><label>🏠 الحالة (اختياري)</label><select id="exp-case" style="padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-family:Cairo,sans-serif;font-size:14px;width:100%;"><option value="">-- بدون حالة --</option></select></div>
           <div class="form-group"><label>المبلغ (جنيه) *</label><input type="number" id="exp-amount" placeholder="0.00" min="1"></div>
           <div class="form-group"><label>التاريخ *</label><input type="date" id="exp-date"></div>
           <div class="form-group"><label>ملاحظات</label><input type="text" id="exp-notes" placeholder="ملاحظات اختيارية"></div>
@@ -295,53 +293,29 @@
 
 <!-- PROJECTS PAGE -->
 <div class="page" id="page-projects">
-  <div class="page-title"><div class="page-title-text">📋 الصناديق والحالات</div></div>
-  <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border);">
-    <div id="ptab-projects" onclick="switchProjectsTab('projects')" style="padding:10px 22px;cursor:pointer;font-weight:700;font-size:14px;color:var(--primary);border-bottom:3px solid var(--primary);margin-bottom:-2px;">📋 الصناديق</div>
-    <div id="ptab-cases" onclick="switchProjectsTab('cases')" style="padding:10px 22px;cursor:pointer;font-weight:700;font-size:14px;color:var(--text-muted);border-bottom:3px solid transparent;margin-bottom:-2px;">🏠 الحالات</div>
+  <div class="page-title">
+      <div class="page-title-text">📋 إدارة المشاريع والأرشيف</div>
   </div>
-  <div id="tab-projects-content">
-    <div class="card">
-      <div class="card-title">➕ إضافة مشروع جديد</div>
-      <div class="form-grid">
-        <div class="form-group"><label>اسم المشروع *</label><input type="text" id="proj-name" placeholder="اسم المشروع"></div>
-        <div class="form-group"><label>رصيد أول المدة (جنيه)</label><input type="number" id="proj-opening" placeholder="0.00" min="0" value="0"></div>
-        <div class="form-group span2"><label>وصف المشروع</label><textarea id="proj-desc" placeholder="وصف تفصيلي..."></textarea></div>
-        <div class="form-group span2" style="flex-direction:row;align-items:center;gap:8px;">
+  <div class="card">
+    <div class="card-title">➕ إضافة مشروع جديد</div>
+    <div class="form-grid">
+      <div class="form-group"><label>اسم المشروع *</label><input type="text" id="proj-name" placeholder="اسم المشروع"></div>
+      <div class="form-group"><label>رصيد أول المدة (جنيه)</label><input type="number" id="proj-opening" placeholder="0.00" min="0" value="0"></div>
+      <div class="form-group span2"><label>وصف المشروع</label><textarea id="proj-desc" placeholder="وصف تفصيلي..."></textarea></div>
+      <div class="form-group span2" style="flex-direction:row; align-items:center; gap:8px;">
           <input type="checkbox" id="proj-private">
-          <label style="margin:0;cursor:pointer;" for="proj-private">🔒 مشروع خاص (يُخفى من التقارير العامة)</label>
-        </div>
-      </div>
-      <div style="margin-top:16px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="saveProject()">✅ إضافة المشروع</button></div>
-    </div>
-    <div class="card" style="padding:0;">
-      <div style="padding:18px;"><div class="card-title" style="margin:0;">📋 قائمة المشاريع</div></div>
-      <div class="table-wrap" style="border:none;border-radius:0 0 16px 16px;border-top:1px solid var(--border);">
-        <table>
-          <thead><tr><th>الحالة</th><th>المشروع</th><th>رصيد أول</th><th>الرصيد الحالي</th><th>إجراءات</th></tr></thead>
-          <tbody id="projects-table-body"><tr><td colspan="5"><div class="empty"><div class="empty-icon">⏳</div></div></td></tr></tbody>
-        </table>
+          <label style="margin:0; cursor:pointer;" for="proj-private">🔒 مشروع خاص (يخفى من تقرير المشاريع العام)</label>
       </div>
     </div>
+    <div style="margin-top:16px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="saveProject()">✅ إضافة المشروع</button></div>
   </div>
-  <div id="tab-cases-content" style="display:none;">
-    <div class="card">
-      <div class="card-title">➕ إضافة حالة جديدة</div>
-      <div class="form-grid">
-        <div class="form-group"><label>كود الحالة *</label><input type="text" id="case-code" placeholder="C-001" dir="ltr" style="text-transform:uppercase;"></div>
-        <div class="form-group"><label>اسم الحالة *</label><input type="text" id="case-name" placeholder="اسم الحالة أو الشخص"></div>
-        <div class="form-group span2"><label>ملاحظات</label><input type="text" id="case-notes" placeholder="عنوان، تفاصيل..."></div>
-      </div>
-      <div style="margin-top:16px;display:flex;justify-content:flex-end;"><button class="btn btn-accent" onclick="saveCase()">➕ إضافة الحالة</button></div>
-    </div>
-    <div class="card" style="padding:0;">
-      <div style="padding:18px;"><div class="card-title" style="margin:0;">🏠 قائمة الحالات</div></div>
-      <div class="table-wrap" style="border:none;border-radius:0 0 16px 16px;border-top:1px solid var(--border);">
-        <table>
-          <thead><tr><th>الكود</th><th>الاسم</th><th>إجمالي الصرف</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
-          <tbody id="cases-table-body"></tbody>
-        </table>
-      </div>
+  <div class="card" style="padding:0;">
+    <div style="padding:18px;"><div class="card-title" style="margin:0;">📋 قائمة المشاريع (الفعالة والمؤرشفة)</div></div>
+    <div class="table-wrap" style="border:none;border-radius:0 0 16px 16px;border-top:1px solid var(--border);">
+      <table>
+        <thead><tr><th>الحالة</th><th>المشروع</th><th>رصيد أول</th><th>الرصيد الحالي</th><th>إجراءات</th></tr></thead>
+        <tbody id="projects-table-body"><tr><td colspan="5"><div class="empty"><div class="empty-icon">⏳</div></div></td></tr></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -541,18 +515,6 @@
   </div>
 </div>
 
-<!-- WA MODAL — رسالة الواتساب الشخصية -->
-<div class="modal-overlay" id="wa-modal">
-  <div class="modal" style="max-width:560px;">
-    <div class="modal-title">📱 رسالة الواتساب جاهزة</div>
-    <div style="background:#e8f5e9;border-radius:14px;padding:16px;margin-bottom:14px;font-size:13px;line-height:2;white-space:pre-wrap;border:1px solid #c8e6c9;color:#1b5e20;max-height:350px;overflow-y:auto;font-family:Cairo,sans-serif;" id="wa-message-text"></div>
-    <div class="modal-actions">
-      <button class="btn btn-outline btn-sm" onclick="closeModal('wa-modal')">إغلاق</button>
-      <button class="btn btn-primary" onclick="openWhatsApp()">📲 فتح واتساب وإرسال</button>
-    </div>
-  </div>
-</div>
-
 <div class="img-modal-overlay" id="img-modal">
   <div class="img-modal" style="max-width: 800px; width: 95%;">
     <div class="modal-title">🖼️ التقرير جاهز — يمكنك مشاركته للجروب</div>
@@ -586,7 +548,7 @@ const firebaseConfig = {
 };
 
 const WA_GROUP_LINK='https://chat.whatsapp.com/KQxUlARMPbWCdjFn6d3XKC';
-let db = { donors:[], projects:[], transactions:[], cases:[], qard:{ deposits:[], loans:[] } };
+let db = { donors:[], projects:[], transactions:[], qard:{ deposits:[], loans:[] } };
 let selectedProject = null;
 let currentWaPhone = '';
 let currentWaMessage = '';
@@ -610,7 +572,6 @@ try {
       db.donors       = parsed.donors       || [];
       db.projects     = parsed.projects     || [];
       db.transactions = parsed.transactions || [];
-      if (Array.isArray(parsed.cases)) db.cases = parsed.cases;
       if (parsed.qard) {
         db.qard = {
           deposits: Array.isArray(parsed.qard.deposits) ? parsed.qard.deposits : [],
@@ -623,11 +584,8 @@ try {
 
 function loadDB() {
   const today = new Date().toISOString().split('T')[0];
-  // كل حقول التاريخ تأخذ اليوم كافتراضي
-  ['don-date','exp-date','qard-deposit-date','qard-loan-date','qard-repay-date'].forEach(id => {
-    const el = document.getElementById(id);
-    if(el && !el.value) el.value = today;
-  });
+  if (document.getElementById('don-date')) document.getElementById('don-date').value = today;
+  if (document.getElementById('exp-date')) document.getElementById('exp-date').value = today;
 
   // ① عرض البيانات المحلية فوراً
   renderAll();
@@ -739,7 +697,6 @@ async function saveDB() {
       donors:       db.donors       || [],
       projects:     db.projects     || [],
       transactions: db.transactions || [],
-      cases:        db.cases        || [],
       qard: {
         deposits: db.qard?.deposits || [],
         loans:    db.qard?.loans    || []
@@ -794,18 +751,10 @@ function exportToExcel() {
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  const pg = document.getElementById('page-'+id);
-  if(!pg) return;
-  pg.classList.add('active');
-  const pages = ['home','donors','projects','qard','settings'];
-  const idx = pages.indexOf(id);
-  if(idx >= 0 && document.querySelectorAll('.nav-btn')[idx]) 
-    document.querySelectorAll('.nav-btn')[idx].classList.add('active');
-  if(id==='home')     renderHomePage();
-  if(id==='projects') renderProjectsTable();
-  if(id==='donors')   renderDonorsTable();
-  if(id==='qard')     renderQardPage();
-  window.scrollTo(0,0);
+  document.getElementById('page-'+id).classList.add('active');
+  const idx = ['home','donors','projects','settings'].indexOf(id);
+  if(idx >= 0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+  if(id==='home') renderHomePage(); if(id==='projects') renderProjectsTable(); if(id==='donors') renderDonorsTable(); window.scrollTo(0,0);
 }
 function switchTab(tabId, el) {
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
@@ -820,20 +769,7 @@ function toast(msg, type='') {
 }
 function formatDate(d){if(!d)return'-';const p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
 function getGenderLabel(g) { if(g==='M') return 'الأستاذ'; if(g==='F') return 'الأستاذة'; if(g==='C') return 'جهة/شركة'; return 'الأستاذ(ة)'; }
-function getPrivacyDesc(t) {
-  if(t.type === 'expense') {
-    // لو فيه حالة، اعرض كودها في البيان
-    if(t.caseId) {
-      const c = db.cases ? db.cases.find(x=>String(x.id)===String(t.caseId)) : null;
-      if(c) return t.desc.replace('['+c.code+']','').trim() + ' [' + c.code + ']';
-    }
-    return t.desc;
-  }
-  if(t.donorId === 'general') return t.desc;
-  const d = db.donors.find(x=>x.id === t.donorId);
-  if(d) return 'مساهمة ◀ كود: ' + d.code;
-  return t.desc;
-}
+function getPrivacyDesc(t) { if(t.type === 'expense' || t.donorId === 'general') return t.desc; const d = db.donors.find(x=>x.id === t.donorId); if(d) return `مساهمة ◀ كود: ${d.code}`; return t.desc; }
 
 // ==========================================
 // 5. المتبرعون ومربع البحث والتذكير الذكي
@@ -1037,25 +973,16 @@ function getProjectBalance(projectId) {
   const txnBalance = db.transactions.filter(t=>t.projectId===projectId).reduce((b,t) => t.type==='donation' ? b+t.amount : b-t.amount, 0); return opening + txnBalance;
 }
 function renderHomePage() {
-  const grid = document.getElementById('home-projects-grid');
-  const allActive    = db.projects.filter(p => !p.isArchived);
-  const publicActive = db.projects.filter(p => !p.isArchived && !p.isPrivate);
-  if(!allActive.length) { 
-    grid.innerHTML='<div class="empty">لا توجد مشاريع فعالة</div>'; 
-    document.getElementById('project-actions').style.display='none'; 
-  } else {
-    grid.innerHTML = allActive.map(p=>{
-      const bal=getProjectBalance(p.id), sel=selectedProject && selectedProject.id===p.id;
-      const lockIcon = p.isPrivate ? ' 🔒' : '';
-      return `<div class="project-card ${sel?'selected':''}" onclick="selectProject(${p.id})"><div class="project-name">${p.name}${lockIcon}</div><div class="project-desc">${p.desc||'بدون وصف'}</div><div class="project-balance">${bal>=0?'✅':'⚠️'} الرصيد: ${bal.toLocaleString('ar-EG')} ج</div></div>`;
+  const grid = document.getElementById('home-projects-grid'), activeProjects = db.projects.filter(p => !p.isArchived);
+  if(!activeProjects.length) { grid.innerHTML='<div class="empty">لا توجد مشاريع فعالة</div>'; document.getElementById('project-actions').style.display='none'; }
+  else {
+    grid.innerHTML = activeProjects.map(p=>{
+      const bal=getProjectBalance(p.id), sel=selectedProject && selectedProject.id===p.id, privateIcon = p.isPrivate ? ' 🔒' : '';
+      return `<div class="project-card ${sel?'selected':''}" onclick="selectProject(${p.id})"><div class="project-name">${p.name}${privateIcon}</div><div class="project-desc">${p.desc||'بدون وصف'}</div><div class="project-balance">${bal>=0?'✅':'⚠️'} الرصيد: ${bal.toLocaleString('ar-EG')} ج</div></div>`;
     }).join('');
   }
-  // الإجماليات بدون المشاريع الخاصة
-  const privateIds = new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
-  const totalDon = db.transactions.filter(t=>t.type==='donation' && !privateIds.has(t.projectId)).reduce((s,t)=>s+t.amount,0);
-  document.getElementById('sum-donors').textContent   = db.donors.length;
-  document.getElementById('sum-projects').textContent = publicActive.length;
-  document.getElementById('sum-total').textContent    = totalDon.toLocaleString('ar-EG');
+  const totalDon = db.transactions.filter(t=>t.type==='donation').reduce((s,t)=>s+t.amount,0);
+  document.getElementById('sum-donors').textContent=db.donors.length; document.getElementById('sum-projects').textContent=activeProjects.length; document.getElementById('sum-total').textContent=totalDon.toLocaleString('ar-EG');
 }
 function selectProject(id) { selectedProject = db.projects.find(p=>p.id===id); document.getElementById('project-actions').style.display='block'; renderHomePage(); populateDonorSelect('don-donor'); document.getElementById('tab-donation').click(); }
 
@@ -1086,14 +1013,9 @@ async function saveDonation(){
 async function saveExpense(){
   if(!selectedProject) return toast('⚠️ اختر مشروعاً','error');
   const desc=document.getElementById('exp-desc').value.trim(), amount=parseFloat(document.getElementById('exp-amount').value), date=document.getElementById('exp-date').value, notes=document.getElementById('exp-notes').value.trim();
-  const caseId=document.getElementById('exp-case')?.value||'';
-  const caseObj=caseId?db.cases.find(c=>c.id==caseId):null;
   if(!desc||!amount||amount<=0) return toast('⚠️ أكمل البيانات','error');
-  const fullDesc = caseObj ? desc+' ['+caseObj.code+']' : desc;
-  db.transactions.push({id:Date.now(), type:'expense', projectId:selectedProject.id, amount, date, notes, desc:fullDesc, caseId}); await saveDB();
-  document.getElementById('exp-desc').value=''; document.getElementById('exp-amount').value=''; document.getElementById('exp-notes').value='';
-  if(document.getElementById('exp-case')) document.getElementById('exp-case').value='';
-  toast('✅ تم تسجيل المصروف','success');
+  db.transactions.push({id:Date.now(), type:'expense', projectId:selectedProject.id, amount, date, notes, desc}); await saveDB();
+  document.getElementById('exp-desc').value=''; document.getElementById('exp-amount').value=''; document.getElementById('exp-notes').value=''; toast('✅ تم تسجيل المصروف','success');
 }
 
 function openEditTx(id) {
@@ -1134,38 +1056,15 @@ function renderStatement(){
     const rows=txns.map(t=>{
       const isIn=t.type==='donation'; if(isIn)runBal+=t.amount;else runBal-=t.amount;
       let displayDesc = getPrivacyDesc(t);
-      const waResendBtn = (isIn && t.donorId && t.donorId !== 'general')
-        ? `<button class="btn btn-success btn-sm" style="padding:4px 6px;font-size:11px;" title="إعادة إرسال رسالة الواتساب" onclick="resendWaFromStatement(${t.id})">📲</button>`
-        : '';
       return `<tr><td dir="ltr" style="text-align:right;">${formatDate(t.date)}</td><td style="font-weight:bold;">${displayDesc}${t.notes?'<br><small style="color:#777; font-weight:normal;">'+t.notes+'</small>':''}</td><td class="balance-pos">${isIn?t.amount.toLocaleString('ar-EG'):'-'}</td><td class="balance-neg">${!isIn?t.amount.toLocaleString('ar-EG'):'-'}</td><td style="font-weight:bold;">${runBal.toLocaleString('ar-EG')}</td>
-      <td style="display:flex;gap:4px;flex-wrap:wrap;">${waResendBtn}<button class="btn btn-warn btn-sm" style="padding:4px 8px;" onclick="openEditTx(${t.id})">✏️</button><button class="btn btn-outline btn-sm" style="padding:4px 8px;" onclick="deleteTx(${t.id})">🗑️</button></td></tr>`;
+      <td style="display:flex;gap:4px;"><button class="btn btn-warn btn-sm" style="padding:4px 8px;" onclick="openEditTx(${t.id})">✏️</button><button class="btn btn-outline btn-sm" style="padding:4px 8px;" onclick="deleteTx(${t.id})">🗑️</button></td></tr>`;
     }).join('');
     html+=`<div class="table-wrap"><table class="stmt-table"><thead><tr><th>التاريخ</th><th>البيان</th><th>وارد</th><th>صادر</th><th>الرصيد</th><th>إجراء</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   } else { html+=`<div class="empty">لا توجد حركات</div>`; }
   document.getElementById('stmt-body').innerHTML=html;
 }
 
-
-// إعادة إرسال رسالة الواتساب من كشف الحساب
-function resendWaFromStatement(txId) {
-  const tx = db.transactions.find(t=>t.id===txId);
-  if(!tx) return toast('⚠️ لم يُعثر على الحركة','error');
-  const donor = db.donors.find(d=>d.id===tx.donorId);
-  if(!donor) return toast('⚠️ لم يُعثر على المتبرع','error');
-  const project = db.projects.find(p=>p.id===tx.projectId);
-  if(!project) return toast('⚠️ لم يُعثر على المشروع','error');
-  showWhatsAppModal(donor, tx.amount, tx.date, project, txId);
-}
-
-function renderAll() { 
-  renderDonorsTable(); 
-  renderProjectsTable(); 
-  renderHomePage(); 
-  populateCaseSelect();
-  if(selectedProject && document.getElementById('tab-statement').classList.contains('active')) renderStatement();
-  if(document.getElementById('page-qard')?.classList.contains('active')) renderQardPage();
-  if(document.getElementById('tab-cases-content')?.style.display==='block') renderCasesTable();
-}
+function renderAll() { renderDonorsTable(); renderProjectsTable(); renderHomePage(); if(selectedProject && document.getElementById('tab-statement').classList.contains('active')) renderStatement(); }
 
 function showWhatsAppModal(donor, amount, date, project, currentTxId){
   const donorTxns = db.transactions.filter(t => t.type === 'donation' && t.donorId === donor.id);
@@ -1511,10 +1410,8 @@ function generateSixMonthsReport() {
 
   // فلترة الحركات بناءً على الـ 6 شهور
   const startKey = last6Months[0].key;
-  // استثناء المشاريع الخاصة من تقرير 6 شهور
-  const _privateIds6m = new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
-  const txns = db.transactions.filter(t => t.date && t.date >= startKey && !_privateIds6m.has(t.projectId));
-  if(!txns.length) return toast('⚠️ لا توجد حركات في آخر 6 شهور', 'error');
+  const txns = db.transactions.filter(t => t.date && t.date >= startKey);
+  if(!txns.length) return toast('⚠️ لا توجد حركات مسجلة في آخر 6 شهور', 'error');
 
   const monthlyStats = {}; last6Months.forEach(x => monthlyStats[x.key] = { in: 0, out: 0, donors: new Set() });
   const donorStats = {}; 
@@ -1718,9 +1615,8 @@ function generateTopDonorsReport() {
   }
 
   const donorTotals={};
-  const _privateIdsTop = new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
   db.transactions
-    .filter(t=>t.type==='donation'&&t.donorId&&t.donorId!=='general'&&t.date&&last6Keys.some(k=>t.date.startsWith(k))&&!_privateIdsTop.has(t.projectId))
+    .filter(t=>t.type==='donation'&&t.donorId&&t.donorId!=='general'&&t.date&&last6Keys.some(k=>t.date.startsWith(k)))
     .forEach(t=>{donorTotals[t.donorId]=(donorTotals[t.donorId]||0)+t.amount;});
 
   const sorted=Object.entries(donorTotals)
@@ -1953,7 +1849,7 @@ function generateDonorCardReport() {
   // اعرض قائمة لاختيار المساهم
   const list=db.donors.map(d=>{
     const total=db.transactions.filter(t=>t.type==='donation'&&t.donorId===d.id).reduce((s,t)=>s+t.amount,0);
-    return `<div onclick="drawDonorCard('${d.id}')" style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background .15s;" onmouseover="this.style.background='#f0f7f0'" onmouseout="this.style.background=''">
+    return `<div onclick="drawDonorCard(${d.id})" style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background .15s;" onmouseover="this.style.background='#f0f7f0'" onmouseout="this.style.background=''">
       <div><strong style="color:var(--primary);">${d.name}</strong> <span style="font-size:12px;color:#777;">(${d.code})</span></div>
       <span style="color:var(--success);font-weight:700;">${total.toLocaleString('ar-EG')} ج</span>
     </div>`;
@@ -1967,17 +1863,14 @@ function generateDonorCardReport() {
 
 function drawDonorCard(donorId) {
   document.getElementById('donor-card-pick')?.remove();
-  document.getElementById('donor-card-search-modal')?.remove();
-  // مقارنة == بدل === عشان نتجنب string vs number
-  const donor=db.donors.find(d=>d.id==donorId);
-  if(!donor){ toast('⚠️ لم يُعثر على المساهم','error'); return; }
-  const privateIds=new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
-  const txns=db.transactions.filter(t=>t.type==='donation'&&t.donorId==donorId&&!privateIds.has(t.projectId)).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const donor=db.donors.find(d=>d.id===donorId);
+  if(!donor) return;
+  const txns=db.transactions.filter(t=>t.type==='donation'&&t.donorId===donorId).sort((a,b)=>new Date(a.date)-new Date(b.date));
   const total=txns.reduce((s,t)=>s+t.amount,0);
   const count=txns.length;
   const firstDate=txns.length?txns[0].date:'';
   const lastDate=txns.length?txns[txns.length-1].date:'';
-  const overallTotal=db.transactions.filter(t=>t.type==='donation'&&!privateIds.has(t.projectId)).reduce((s,t)=>s+t.amount,0);
+  const overallTotal=db.transactions.filter(t=>t.type==='donation').reduce((s,t)=>s+t.amount,0);
   const pct=overallTotal>0?Math.round(total/overallTotal*100):0;
 
   // آخر 6 شهور لهذا المساهم
@@ -2104,12 +1997,10 @@ function drawDonorCard(donorId) {
 // ============================================================
 // 📢 رسالة الجروب الشهرية — أكواد فقط بدون أسماء
 // ============================================================
-function generateGroupMessage(monthOffset=0) {
+function generateGroupMessage() {
   // رسالة الجروب الآن صورة كانفاس احترافية — بدون رابط جروب
   const now = new Date();
-  // monthOffset=0 الشهر الحالي, monthOffset=1 الشهر السابق
-  const targetDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1);
-  const thisM = targetDate.getMonth()+1, thisY = targetDate.getFullYear();
+  const thisM = now.getMonth()+1, thisY = now.getFullYear();
   const monthKey = `${thisY}-${String(thisM).padStart(2,'0')}`;
 
   const last6Keys=[];
@@ -2117,8 +2008,7 @@ function generateGroupMessage(monthOffset=0) {
   const prev5Keys=last6Keys.slice(0,5);
   const prev5Total=db.transactions.filter(t=>t.type==='donation'&&t.date&&prev5Keys.some(k=>t.date.startsWith(k))).reduce((s,t)=>s+t.amount,0);
   const avg5=prev5Total/5;
-  const _privateIdsGrp = new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
-  const thisTxns=db.transactions.filter(t=>t.type==='donation'&&t.date&&t.date.startsWith(monthKey)&&!_privateIdsGrp.has(t.projectId));
+  const thisTxns=db.transactions.filter(t=>t.type==='donation'&&t.date&&t.date.startsWith(monthKey));
   const thisTotal=thisTxns.reduce((s,t)=>s+t.amount,0);
   const paidIds=new Set(thisTxns.filter(t=>t.donorId&&t.donorId!=='general').map(t=>t.donorId));
   const paidCodes=[...paidIds].map(id=>db.donors.find(d=>d.id==id)?.code||'?').sort();
@@ -2126,7 +2016,7 @@ function generateGroupMessage(monthOffset=0) {
   const thisCount=paidIds.size;
   const vsAvg=avg5>0?Math.round((thisTotal-avg5)/avg5*100):0;
   const activeP=db.projects.filter(p=>!p.isArchived&&!p.isPrivate);
-  const total6=db.transactions.filter(t=>t.type==='donation'&&t.date&&last6Keys.some(k=>t.date.startsWith(k))&&!_privateIdsGrp.has(t.projectId)).reduce((s,t)=>s+t.amount,0);
+  const total6=db.transactions.filter(t=>t.type==='donation'&&t.date&&last6Keys.some(k=>t.date.startsWith(k))).reduce((s,t)=>s+t.amount,0);
 
   // ── رسم الصورة ──
   const DPR=2, W=1000;
@@ -2205,41 +2095,22 @@ function generateGroupMessage(monthOffset=0) {
   drawSection('✅ المساهمون هذا الشهر', paidCodes, '#1a5c38', '#0f3d25');
   drawSection('⏳ لم تُسجَّل مساهمتهم بعد', unpaidCodes, '#c0392b', '#7b241c');
 
-  // ── حركات المشاريع في هذا الشهر (وارد + صادر لكل مشروع) ──
-  const projMonthStats = {};
-  db.transactions.filter(t=>t.date&&t.date.startsWith(monthKey)&&!_privateIdsGrp.has(t.projectId)).forEach(t=>{
-    if(!projMonthStats[t.projectId]) projMonthStats[t.projectId]={in:0,out:0};
-    if(t.type==='donation') projMonthStats[t.projectId].in+=t.amount;
-    else projMonthStats[t.projectId].out+=t.amount;
-  });
-  const activeMonthProjs = Object.entries(projMonthStats)
-    .map(([id,s])=>({proj:db.projects.find(p=>p.id==id),s}))
-    .filter(x=>x.proj && (x.s.in>0||x.s.out>0));
-
-  if(activeMonthProjs.length){
+  // أرصدة المشاريع
+  if(activeP.length){
     ctx.fillStyle='#1a3a5c'; roundRect(ctx,20,curY,W-40,44,{tl:10,tr:10,bl:0,br:0}); ctx.fill();
     ctx.fillStyle='white'; ctx.font='bold 22px Cairo,Arial'; ctx.textAlign='right';
-    ctx.fillText('💹 حركة الصناديق هذا الشهر',W-36,curY+30);
-    const projSecH=activeMonthProjs.length*52+10;
+    ctx.fillText('🎯 أرصدة المشاريع الفعالة',W-36,curY+30);
+    const projSecH=activeP.length*44+10;
     ctx.fillStyle='white'; roundRect(ctx,20,curY+44,W-40,projSecH,{tl:0,tr:0,bl:10,br:10}); ctx.fill();
-    activeMonthProjs.forEach((item,i)=>{
-      const py=curY+44+8+i*52;
-      const bal=getProjectBalance(item.proj.id);
-      ctx.fillStyle='#f0f5f1'; roundRect(ctx,32,py,W-64,44,8); ctx.fill();
-      // اسم المشروع
-      ctx.textAlign='right'; ctx.fillStyle='#0f3d25'; ctx.font='bold 18px Cairo,Arial';
-      ctx.fillText(item.proj.name,W-44,py+20);
-      // وارد / صادر / رصيد
-      ctx.font='16px Cairo,Arial';
-      ctx.fillStyle='#1a7a40'; ctx.textAlign='right';
-      ctx.fillText('⬆ '+item.s.in.toLocaleString('ar-EG')+' ج',W-44,py+40);
-      ctx.fillStyle='#c0392b';
-      const midX = W/2+40;
-      ctx.textAlign='center';
-      ctx.fillText('⬇ '+item.s.out.toLocaleString('ar-EG')+' ج',midX,py+40);
-      ctx.fillStyle=bal>=0?'#0f3d25':'#c0392b';
-      ctx.textAlign='left';
-      ctx.fillText('💰 '+bal.toLocaleString('ar-EG')+' ج',44,py+40);
+    activeP.forEach((p,i)=>{
+      const py=curY+44+8+i*44;
+      const bal=getProjectBalance(p.id);
+      const barColor=bal>=0?'#1a5c38':'#c0392b';
+      ctx.fillStyle='#f0f5f1'; roundRect(ctx,32,py,W-64,36,8); ctx.fill();
+      ctx.textAlign='right'; ctx.fillStyle='#0f3d25'; ctx.font='bold 19px Cairo,Arial';
+      ctx.fillText(p.name,W-44,py+24);
+      ctx.textAlign='left'; ctx.fillStyle=barColor; ctx.font='bold 21px Cairo,Arial';
+      ctx.fillText(bal.toLocaleString('ar-EG')+' ج',44,py+24);
     });
     curY+=44+projSecH+16;
   }
