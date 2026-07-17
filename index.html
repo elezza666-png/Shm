@@ -8,7 +8,7 @@
   <title>نظام إدارة التبرعات (السحابي برو)</title>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
   
-  <!-- مكتبة PDF - defer عشان ما توقفش التحميل -->
+  <!-- Firebase SDK — يُحمّل بعد الصفحة -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
 
   <style>
@@ -157,7 +157,7 @@
       <div>
         <div class="logo-text">إدارة التبرعات</div>
         <div class="logo-sub" style="display: flex; align-items: center; gap: 5px;">
-          السحابي برو <span id="firebase-status" onclick="syncNow()" title="اضغط للمزامنة" style="cursor:pointer;">محلي 🟡</span>
+          السحابي برو <span id="firebase-status">جاري التحميل...</span>
         </div>
       </div>
     </div>
@@ -177,12 +177,11 @@
   <div class="page-title">
     <div class="page-title-text">📊 لوحة التحكم</div>
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button class="btn btn-primary btn-sm" onclick="generateSixMonthsReport()">🗓️ تقرير 6 شهور</button>
-        <button class="btn btn-info btn-sm" onclick="exportActiveProjectsImage()">📸 المشاريع الفعالة</button>
-        <button class="btn btn-accent btn-sm" onclick="generateTopDonorsReport()">🏆 أبطال التبرع</button>
-        <button class="btn btn-success btn-sm" onclick="generateMonthlyTrendReport()">📈 منحنى النمو</button>
-        <button class="btn btn-warn btn-sm" onclick="generateDonorCardReport()">💳 بطاقة مساهم</button>
-        <button class="btn btn-outline btn-sm" onclick="generateGroupMessage()">📢 رسالة الجروب</button>
+        <button class="btn btn-primary btn-sm" onclick="generateSixMonthsReport()">🗓️ تقرير آخر 6 شهور</button>
+        <button class="btn btn-info btn-sm" onclick="exportActiveProjectsImage()">📸 تقرير المشاريع الفعالة</button>
+        <button class="btn btn-accent btn-sm" onclick="openDonorCardSearch()">💳 بطاقة مساهم</button>
+        <button class="btn btn-warn btn-sm" onclick="generateGroupMessage(0)">📢 رسالة هذا الشهر</button>
+        <button class="btn btn-outline btn-sm" onclick="generateGroupMessage(1)">📢 رسالة الشهر السابق</button>
     </div>
   </div>
   
@@ -193,7 +192,7 @@
   </div>
   <div class="card">
     <div class="card-title">🎯 اختر مشروعاً للعمل عليه</div>
-    <div class="projects-grid" id="home-projects-grid"><div class="empty"><div class="empty-icon">📋</div><div class="empty-text">لا توجد مشاريع بعد</div></div></div>
+    <div class="projects-grid" id="home-projects-grid"><div class="empty"><div class="empty-icon">⏳</div><div class="empty-text">جاري التحميل...</div></div></div>
   </div>
   
   <div id="project-actions" style="display:none;">
@@ -322,85 +321,51 @@
 
 <!-- QARD HASSAN PAGE -->
 <div class="page" id="page-qard">
-  <div class="page-title">
-    <div class="page-title-text">🤝 صندوق القرض الحسن</div>
+  <div class="page-title"><div class="page-title-text">🤝 صندوق القرض الحسن</div></div>
+
+  <div class="summary-strip">
+    <div class="strip-card"><div class="num" id="qard-balance" style="color:var(--success)">0</div><div class="lbl">💰 رصيد الصندوق (ج)</div></div>
+    <div class="strip-card"><div class="num" id="qard-lent">0</div><div class="lbl">📤 إجمالي القروض</div></div>
+    <div class="strip-card"><div class="num" id="qard-returned">0</div><div class="lbl">📥 إجمالي المسدَّد</div></div>
   </div>
 
-  <!-- ملخص الصندوق -->
-  <div class="summary-strip" id="qard-summary-strip">
-    <div class="strip-card">
-      <div class="num" id="qard-balance">0</div>
-      <div class="lbl">💰 رصيد الصندوق (ج)</div>
-    </div>
-    <div class="strip-card">
-      <div class="num" id="qard-lent">0</div>
-      <div class="lbl">📤 إجمالي القروض</div>
-    </div>
-    <div class="strip-card">
-      <div class="num" id="qard-returned">0</div>
-      <div class="lbl">📥 إجمالي المسدَّد</div>
-    </div>
-  </div>
-
-  <!-- إيداع في الصندوق -->
   <div class="card">
-    <div class="card-title">💵 إيداع في صندوق القرض الحسن</div>
+    <div class="card-title">💵 إيداع في الصندوق</div>
     <div class="form-grid">
       <div class="form-group"><label>المبلغ (جنيه) *</label><input type="number" id="qard-deposit-amount" placeholder="0.00" min="1"></div>
       <div class="form-group"><label>التاريخ *</label><input type="date" id="qard-deposit-date"></div>
-      <div class="form-group span2"><label>ملاحظات</label><input type="text" id="qard-deposit-notes" placeholder="مصدر الإيداع أو ملاحظات"></div>
+      <div class="form-group span2"><label>ملاحظات</label><input type="text" id="qard-deposit-notes" placeholder="مصدر الإيداع..."></div>
     </div>
-    <div style="margin-top:16px;display:flex;justify-content:flex-end;">
-      <button class="btn btn-primary" onclick="saveQardDeposit()">💵 إيداع</button>
-    </div>
+    <div style="margin-top:14px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="saveQardDeposit()">💵 إيداع</button></div>
   </div>
 
-  <!-- منح قرض جديد -->
   <div class="card">
     <div class="card-title">📤 منح قرض جديد</div>
     <div class="form-grid">
       <div class="form-group"><label>اسم المقترض *</label><input type="text" id="qard-borrower-name" placeholder="الاسم كاملاً"></div>
       <div class="form-group"><label>المبلغ (جنيه) *</label><input type="number" id="qard-loan-amount" placeholder="0.00" min="1"></div>
       <div class="form-group"><label>التاريخ *</label><input type="date" id="qard-loan-date"></div>
-      <div class="form-group"><label>ملاحظات السداد</label><input type="text" id="qard-loan-notes" placeholder="مثال: يسدد شهرياً 500 ج"></div>
+      <div class="form-group"><label>ملاحظات السداد</label><input type="text" id="qard-loan-notes" placeholder="مثال: يسدد 500 ج شهرياً"></div>
     </div>
-    <div style="margin-top:16px;display:flex;justify-content:flex-end;">
-      <button class="btn btn-accent" onclick="saveQardLoan()">📤 منح القرض</button>
-    </div>
+    <div style="margin-top:14px;display:flex;justify-content:flex-end;"><button class="btn btn-accent" onclick="saveQardLoan()">📤 منح القرض</button></div>
   </div>
 
-  <!-- سجل القروض -->
   <div class="card" style="padding:0;">
-    <div style="padding:18px;"><div class="card-title" style="margin:0;">📋 سجل القروض والمدفوعات</div></div>
+    <div style="padding:16px;"><div class="card-title" style="margin:0;">📋 سجل القروض</div></div>
     <div class="table-wrap" style="border:none;border-top:1px solid var(--border);border-radius:0 0 16px 16px;">
       <table>
-        <thead>
-          <tr>
-            <th>المقترض</th>
-            <th>المبلغ</th>
-            <th>المسدَّد</th>
-            <th>المتبقي</th>
-            <th>الحالة</th>
-            <th>ملاحظات</th>
-            <th>إجراء</th>
-          </tr>
-        </thead>
-        <tbody id="qard-loans-body">
-          <tr><td colspan="7"><div class="empty"><div class="empty-icon">🤝</div><div class="empty-text">لا توجد قروض بعد</div></div></td></tr>
-        </tbody>
+        <thead><tr><th>المقترض</th><th>القرض</th><th>المسدَّد</th><th>المتبقي</th><th>الحالة</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
+        <tbody id="qard-loans-body"></tbody>
       </table>
     </div>
   </div>
 
-  <!-- سجل الإيداعات -->
   <div class="card" style="padding:0;">
-    <div style="padding:18px;"><div class="card-title" style="margin:0;">💵 سجل الإيداعات</div></div>
+    <div style="padding:16px;"><div class="card-title" style="margin:0;">💵 سجل الإيداعات</div></div>
     <div class="table-wrap" style="border:none;border-top:1px solid var(--border);border-radius:0 0 16px 16px;">
       <table>
         <thead><tr><th>التاريخ</th><th>المبلغ</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
-        <tbody id="qard-deposits-body">
-          <tr><td colspan="4"><div class="empty"><div class="empty-icon">💵</div><div class="empty-text">لا توجد إيداعات بعد</div></div></td></tr>
-        </tbody>
+        <tbody id="qard-deposits-body"></tbody>
       </table>
     </div>
   </div>
@@ -411,19 +376,10 @@
   <div class="modal">
     <div class="modal-title">💚 تسجيل دفعة سداد</div>
     <input type="hidden" id="qard-repay-loan-id">
-    <div id="qard-repay-info" style="background:#e8f5e9;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;"></div>
-    <div style="margin-bottom:12px;">
-      <label style="font-size:13px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:6px;">مبلغ الدفعة (جنيه) *</label>
-      <input type="number" id="qard-repay-amount" placeholder="0.00" min="1">
-    </div>
-    <div style="margin-bottom:12px;">
-      <label style="font-size:13px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:6px;">التاريخ *</label>
-      <input type="date" id="qard-repay-date">
-    </div>
-    <div style="margin-bottom:12px;">
-      <label style="font-size:13px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:6px;">ملاحظات</label>
-      <input type="text" id="qard-repay-notes" placeholder="اختيارية">
-    </div>
+    <div id="qard-repay-info" style="background:#e8f5e9;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.8;"></div>
+    <div class="edit-form-group"><label>مبلغ الدفعة (جنيه) *</label><input type="number" id="qard-repay-amount" placeholder="0.00" min="1"></div>
+    <div class="edit-form-group"><label>التاريخ *</label><input type="date" id="qard-repay-date"></div>
+    <div class="edit-form-group"><label>ملاحظات</label><input type="text" id="qard-repay-notes" placeholder="اختيارية"></div>
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" onclick="closeModal('qard-repay-modal')">إلغاء</button>
       <button class="btn btn-primary" onclick="saveQardRepay()">✅ حفظ الدفعة</button>
@@ -451,10 +407,6 @@
 </div>
 
 </div>
-
-
-<!-- MODAL رسالة الجروب — محوّلة لصورة -->
-<div class="modal-overlay" id="group-msg-modal" style="display:none;"></div>
 
 <!-- MODALS -->
 <div class="modal-overlay" id="donor-report-modal">
@@ -547,165 +499,81 @@ const firebaseConfig = {
   appId: "1:36705406701:web:7504a757d507dd8ffd86e4"
 };
 
-const WA_GROUP_LINK='https://chat.whatsapp.com/KQxUlARMPbWCdjFn6d3XKC';
-let db = { donors:[], projects:[], transactions:[], qard:{ deposits:[], loans:[] } };
-let selectedProject = null;
-let currentWaPhone = '';
-let currentWaMessage = '';
-let currentDownloadName = 'تقرير.png';
+const WA_GROUP_LINK = 'https://chat.whatsapp.com/KQxUlARMPbWCdjFn6d3XKC';
+let db = { donors:[], projects:[], transactions:[], cases:[], qard:{deposits:[],loans:[]} };
+let selectedProject = null, currentWaPhone = '', currentWaMessage = '', currentDownloadName = 'تقرير.png';
 let fbInitialized = false;
 
-// ── مساعد عرض الحالة ──
-function setStatus(text, isOffline=false) {
-  const el = document.getElementById('firebase-status');
-  if (!el) return;
-  el.textContent = text;
-  el.className = isOffline ? 'offline' : '';
-}
-
-// ── تحميل النسخة المحلية فوراً ──
-try {
-  const localData = localStorage.getItem('charity_db_v5');
-  if (localData) {
-    const parsed = JSON.parse(localData);
-    if (parsed && (parsed.donors || parsed.projects)) {
-      db.donors       = parsed.donors       || [];
-      db.projects     = parsed.projects     || [];
-      db.transactions = parsed.transactions || [];
-      if (parsed.qard) {
-        db.qard = {
-          deposits: Array.isArray(parsed.qard.deposits) ? parsed.qard.deposits : [],
-          loans:    Array.isArray(parsed.qard.loans)    ? parsed.qard.loans    : []
-        };
-      }
+// تحميل البيانات المحلية فوراً
+(function(){
+  try {
+    const s = localStorage.getItem('charity_db_v5');
+    if(s) {
+      const p = JSON.parse(s);
+      db.donors       = p.donors       || [];
+      db.projects     = p.projects     || [];
+      db.transactions = p.transactions || [];
+      db.cases        = p.cases        || [];
+      if(p.qard) db.qard = { deposits: p.qard.deposits||[], loans: p.qard.loans||[] };
     }
-  }
-} catch(e) { console.warn('Local load error:', e); }
+  } catch(e) {}
+})();
+
+function setStatus(t, off) {
+  const el = document.getElementById('firebase-status');
+  if(el) { el.textContent = t; el.className = off ? 'offline' : ''; }
+}
 
 function loadDB() {
   const today = new Date().toISOString().split('T')[0];
-  if (document.getElementById('don-date')) document.getElementById('don-date').value = today;
-  if (document.getElementById('exp-date')) document.getElementById('exp-date').value = today;
-
-  // ① عرض البيانات المحلية فوراً
+  ['don-date','exp-date'].forEach(id => { const el=document.getElementById(id); if(el&&!el.value) el.value=today; });
   renderAll();
-
-  // ② Firebase بعد 300ms — بسيط وموثوق
+  setStatus('محلي 🟡', true);
   setTimeout(_connectFirebase, 300);
 }
 
 function _connectFirebase() {
-  if (typeof firebase !== 'undefined' && typeof firebase.database === 'function') {
-    _initFB(); return;
-  }
-
-  // تحميل الـ SDK مرة واحدة بـ CDN موثوق
-  function addScript(src, cb, fallback) {
-    const s = document.createElement('script');
-    s.src = src;
-    s.async = true;
-    s.onload = cb;
-    s.onerror = fallback || function(){ setStatus('خطأ تحميل 🔴', true); };
+  if(typeof firebase !== 'undefined' && typeof firebase.database === 'function') { _initFB(); return; }
+  function addScript(src, cb) {
+    const s = document.createElement('script'); s.src = src; s.async = true;
+    s.onload = cb; s.onerror = ()=>setStatus('خطأ SDK 🔴', true);
     document.head.appendChild(s);
   }
-
-  const BASE = 'https://www.gstatic.com/firebasejs/8.10.1/';
-  addScript(BASE + 'firebase-app.js', function() {
-    addScript(BASE + 'firebase-database.js', _initFB);
+  addScript('https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js', ()=>{
+    addScript('https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js', _initFB);
   });
 }
 
 function _initFB() {
   try {
-    if (!fbInitialized) {
-      if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-      fbInitialized = true;
-    }
-
-    firebase.database().ref('.info/connected').on('value', function(snap) {
-      setStatus(snap.val() ? 'متصل 🟢' : 'محلي 🟡', !snap.val());
-    });
-
-    firebase.database().ref('charity_db').on('value', function(snap) {
+    if(!fbInitialized) { if(!firebase.apps.length) firebase.initializeApp(firebaseConfig); fbInitialized=true; }
+    firebase.database().ref('.info/connected').on('value', s => setStatus(s.val()?'متصل 🟢':'محلي 🟡', !s.val()));
+    firebase.database().ref('charity_db').on('value', snap => {
       const data = snap.val();
-      if (!data) { setStatus('متصل — لا بيانات 🟡', true); return; }
-
-      if (Array.isArray(data.donors))       db.donors       = data.donors;
-      if (Array.isArray(data.projects))     db.projects     = data.projects;
-      if (Array.isArray(data.transactions)) db.transactions = data.transactions;
-      if (data.qard) {
-        db.qard = {
-          deposits: Array.isArray(data.qard.deposits) ? data.qard.deposits : [],
-          loans:    Array.isArray(data.qard.loans)    ? data.qard.loans    : []
-        };
-      }
-
-      try { localStorage.setItem('charity_db_v5', JSON.stringify(db)); } catch(e) {}
+      if(!data) return;
+      if(Array.isArray(data.donors))       db.donors       = data.donors;
+      if(Array.isArray(data.projects))     db.projects     = data.projects;
+      if(Array.isArray(data.transactions)) db.transactions = data.transactions;
+      if(Array.isArray(data.cases))        db.cases        = data.cases;
+      if(data.qard) db.qard = { deposits: Array.isArray(data.qard.deposits)?data.qard.deposits:[], loans: Array.isArray(data.qard.loans)?data.qard.loans:[] };
+      try { localStorage.setItem('charity_db_v5', JSON.stringify(db)); } catch(e){}
       renderAll();
       setStatus('متصل 🟢', false);
-
-    }, function(err) {
-      console.warn('FB read error:', err.code, err.message);
-      setStatus('خطأ قراءة 🔴', true);
-    });
-
-  } catch(e) {
-    console.warn('FB init error:', e.message);
-    setStatus('خطأ 🔴', true);
-  }
-}
-
-// زر مزامنة يدوية — لو قال "محلي" يضغطه
-function syncNow() {
-  if (fbInitialized) {
-    setStatus('جاري التحديث...', true);
-    firebase.database().ref('charity_db').once('value').then(function(snap) {
-      const data = snap.val();
-      if (!data) { setStatus('لا بيانات في السحابة 🟡', true); return; }
-      if (Array.isArray(data.donors))       db.donors       = data.donors;
-      if (Array.isArray(data.projects))     db.projects     = data.projects;
-      if (Array.isArray(data.transactions)) db.transactions = data.transactions;
-      if (data.qard) {
-        db.qard = {
-          deposits: Array.isArray(data.qard.deposits) ? data.qard.deposits : [],
-          loans:    Array.isArray(data.qard.loans)    ? data.qard.loans    : []
-        };
-      }
-      try { localStorage.setItem('charity_db_v5', JSON.stringify(db)); } catch(e) {}
-      renderAll();
-      setStatus('متصل 🟢', false);
-      toast('✅ تم التحديث من السحابة', 'success');
-    }).catch(function(err) {
-      setStatus('خطأ مزامنة 🔴', true);
-      toast('❌ ' + err.message, 'error');
-    });
-  } else {
-    _connectFirebase();
-    toast('🔄 جاري الاتصال...', '');
-  }
+    }, err => { console.warn('FB:', err.message); setStatus('محلي 🟡', true); });
+  } catch(e) { console.warn('FB init:', e.message); setStatus('محلي 🟡', true); }
 }
 
 async function saveDB() {
-  // ١. حفظ محلي فوري دائماً
-  try { localStorage.setItem('charity_db_v5', JSON.stringify(db)); } catch(e) {}
+  try { localStorage.setItem('charity_db_v5', JSON.stringify(db)); } catch(e){}
   renderAll();
-
-  // ٢. رفع لـ Firebase لو متصل
-  if (!fbInitialized || typeof firebase === 'undefined') return;
+  if(!fbInitialized || typeof firebase==='undefined') return;
   try {
     await firebase.database().ref('charity_db').set({
-      donors:       db.donors       || [],
-      projects:     db.projects     || [],
-      transactions: db.transactions || [],
-      qard: {
-        deposits: db.qard?.deposits || [],
-        loans:    db.qard?.loans    || []
-      }
+      donors: db.donors||[], projects: db.projects||[],
+      transactions: db.transactions||[], cases: db.cases||[],
+      qard: { deposits: db.qard?.deposits||[], loans: db.qard?.loans||[] }
     });
-  } catch (error) {
-    console.warn('Firebase save error:', error);
-    // حفظ محلي بيشتغل بردو — مش لازم نعرض error
-  }
+  } catch(e) { toast('⚠️ تم الحفظ محلياً',''); }
 }
 
 // ===== التصدير والإستيراد =====
@@ -751,10 +619,18 @@ function exportToExcel() {
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('page-'+id).classList.add('active');
-  const idx = ['home','donors','projects','settings'].indexOf(id);
-  if(idx >= 0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
-  if(id==='home') renderHomePage(); if(id==='projects') renderProjectsTable(); if(id==='donors') renderDonorsTable(); window.scrollTo(0,0);
+  const pg = document.getElementById('page-'+id);
+  if(!pg) return;
+  pg.classList.add('active');
+  const pages = ['home','donors','projects','qard','settings'];
+  const idx = pages.indexOf(id);
+  if(idx >= 0 && document.querySelectorAll('.nav-btn')[idx]) 
+    document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+  if(id==='home')     renderHomePage();
+  if(id==='projects') renderProjectsTable();
+  if(id==='donors')   renderDonorsTable();
+  if(id==='qard')     renderQardPage();
+  window.scrollTo(0,0);
 }
 function switchTab(tabId, el) {
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
@@ -834,58 +710,38 @@ function openDonorReport(donorId) {
     document.getElementById('donor-report-body').innerHTML = html;
     
     document.getElementById('donor-report-wa-btn').onclick = function() {
+        // فحص الشهور الثلاثة الأخيرة
         const now = new Date(); const last3Months = [];
         for(let i=0; i<3; i++) {
-            let d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+            let d = new Date(now.getFullYear(), now.getMonth() - i, 1);
             last3Months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
         }
+
         let missedMonths = [];
-        last3Months.forEach(ym => { if(!donorTxns.some(t=>t.date.startsWith(ym))) missedMonths.push(ym.split('-')[1]); });
-        
-        // حساب الترتيب
-        const totals={};
-        db.transactions.filter(t=>t.type==='donation'&&t.donorId&&t.donorId!=='general')
-          .forEach(t=>{totals[t.donorId]=(totals[t.donorId]||0)+t.amount;});
-        const rankArr=Object.entries(totals).sort((a,b)=>b[1]-a[1]);
-        const myRank=rankArr.findIndex(([id])=>id==donor.id)+1;
+        last3Months.forEach(ym => {
+            let hasDonated = donorTxns.some(t => t.date.startsWith(ym));
+            if(!hasDonated) missedMonths.push(ym.split('-')[1]);
+        });
 
-        let smartText = missedMonths.length > 0
-          ? `💡 نفتقد مساهماتكم في شهر ${missedMonths.reverse().join(' وشهر ')}.
-مساهمة بسيطة شهرياً تصنع فارقاً عظيماً 🌿
-`
-          : `✨ ما شاء الله! انتظامكم في المساهمة مثال يُحتذى به.
-جزاكم الله خيراً على وفائكم 🌿
-`;
-
-        // رسالة تذكير شخصية: الاسم كامل
-        let msg = `السلام عليكم ورحمة الله وبركاته 🌿
-
-${getGenderLabel(donor.gender)} ${donor.name}
-
-نود إحاطتكم بسجل مساهماتكم الكريمة:
-━━━━━━━━━━━━━━━━━━━━
-💰 إجمالي مساهماتكم: ${total.toLocaleString('ar-EG')} جنيه
-🔢 عدد المرات: ${donorTxns.length} مرة`;
-        if(myRank) msg+=`
-🏅 ترتيبكم بين المساهمين: المركز ${myRank}`;
-        msg+=`
-━━━━━━━━━━━━━━━━━━━━
-${smartText}`;
-        if(donorTxns.length>0){
-            msg+=`
-📊 آخر مساهماتكم:
-`;
-            donorTxns.slice(0,5).forEach((t,i)=>{const pName=db.projects.find(p=>p.id===t.projectId)?.name||'-';msg+=`${i+1}. ${pName} — ${t.amount} ج (${formatDate(t.date)})
-`;});
+        let smartText = '';
+        if(missedMonths.length > 0) {
+            smartText = `💡 افتقدنا مساهماتكم الكريمة في بعض الشهور الأخيرة (شهر ${missedMonths.reverse().join('، شهر ')}).\n`;
+        } else {
+            smartText = `💡 ما شاء الله، شكراً لانتظامكم المستمر في المساهمة طوال الشهور الماضية.\n`;
         }
-        msg+=`
-نسأل الله أن يتقبل منكم ويجعلها في ميزان حسناتكم 🤲
+        smartText += `لا تدع شهراً يمر دون أثر يحسب لك في ميزان حسناتك، فمساهمة بسيطة ولو بـ 50 جنيهاً شهرياً تصنع فارقاً عظيماً وتديم عمل الخير. 🌿\n`;
 
-${WA_GROUP_LINK}`;
-        let phone=donor.phone?donor.phone.replace(/[^0-9]/g,''):'';
-        if(phone&&phone.startsWith('0')) phone='2'+phone;
-        if(!phone) return toast('⚠️ لا يوجد رقم هاتف مسجل', 'error');
-        window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank');
+        let msg = `السلام عليكم ورحمة الله وبركاته 🌿\n\n${getGenderLabel(donor.gender)} ${donor.name}\nنود أن نشكركم على دعمكم المستمر ومساهماتكم الكريمة.\n\n💰 إجمالي مساهماتكم حتى الآن: ${total.toLocaleString('ar-EG')} جنيه\n\n`;
+        
+        msg += smartText;
+        
+        if(donorTxns.length > 0) {
+            msg += `\n📊 سجل مساهماتكم الأخيرة:\n`;
+            donorTxns.slice(0, 6).forEach((t, i) => { const pName = db.projects.find(p=>p.id===t.projectId)?.name || '-'; msg += `${i+1}. ${pName} - ${t.amount} ج (${formatDate(t.date)})\n`; });
+        }
+        msg += `\nنسأل الله أن يتقبل منكم ويجعلها في ميزان حسناتكم 🤲\n\n📈 لمتابعة التقارير والإنجازات:\n${WA_GROUP_LINK}`;
+        let phone = donor.phone ? donor.phone.replace(/[^0-9]/g,'') : ''; if(phone && phone.startsWith('0')) phone = '2' + phone;
+        if(!phone) return toast('⚠️ لا يوجد رقم هاتف مسجل لهذا المساهم', 'error'); window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank');
     };
     document.getElementById('donor-report-modal').classList.add('open');
 }
@@ -981,8 +837,10 @@ function renderHomePage() {
       return `<div class="project-card ${sel?'selected':''}" onclick="selectProject(${p.id})"><div class="project-name">${p.name}${privateIcon}</div><div class="project-desc">${p.desc||'بدون وصف'}</div><div class="project-balance">${bal>=0?'✅':'⚠️'} الرصيد: ${bal.toLocaleString('ar-EG')} ج</div></div>`;
     }).join('');
   }
-  const totalDon = db.transactions.filter(t=>t.type==='donation').reduce((s,t)=>s+t.amount,0);
-  document.getElementById('sum-donors').textContent=db.donors.length; document.getElementById('sum-projects').textContent=activeProjects.length; document.getElementById('sum-total').textContent=totalDon.toLocaleString('ar-EG');
+  const _pvtHome = new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
+  const totalDon = db.transactions.filter(t=>t.type==='donation'&&!_pvtHome.has(t.projectId)).reduce((s,t)=>s+t.amount,0);
+  const publicActive = db.projects.filter(p=>!p.isArchived&&!p.isPrivate);
+  document.getElementById('sum-donors').textContent=db.donors.length; document.getElementById('sum-projects').textContent=publicActive.length; document.getElementById('sum-total').textContent=totalDon.toLocaleString('ar-EG');
 }
 function selectProject(id) { selectedProject = db.projects.find(p=>p.id===id); document.getElementById('project-actions').style.display='block'; renderHomePage(); populateDonorSelect('don-donor'); document.getElementById('tab-donation').click(); }
 
@@ -1002,11 +860,11 @@ async function saveDonation(){
   
   document.getElementById('don-amount').value=''; document.getElementById('don-notes').value=''; document.getElementById('don-general-desc').value=''; document.getElementById('don-general-desc-wrapper').style.display='none';
   document.getElementById('don-donor-search').value = ''; document.getElementById('don-donor').value = ''; toast('✅ تم التسجيل','success');
-  if(parsedDonorId !== 'general') {
-    const donor = db.donors.find(d=>d.id===parsedDonorId);
-    if(donor) {
-      setTimeout(() => showWhatsAppModal(donor, amount, date, selectedProject, tx.id), 200);
-    }
+  if(parsedDonorId !== 'general') { 
+    const donor = db.donors.find(d=>d.id===parsedDonorId); 
+    const savedTxId = tx.id;
+    // setTimeout ضروري — يضمن تحديث الـ DOM قبل فتح الـ modal
+    setTimeout(()=>showWhatsAppModal(donor, amount, date, selectedProject, savedTxId), 300); 
   }
 }
 
@@ -1046,18 +904,30 @@ async function deleteTx(id) { if(!confirm('حذف هذه الحركة نهائي
 
 function renderStatement(){
   if(!selectedProject) return;
-  const txns=db.transactions.filter(t=>t.projectId===selectedProject.id).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  // الأحدث فوق
+  const txns=db.transactions.filter(t=>t.projectId===selectedProject.id).sort((a,b)=>new Date(b.date)-new Date(a.date));
   const opening=selectedProject.openingBalance||0, totalIn=txns.filter(t=>t.type==='donation').reduce((s,t)=>s+t.amount,0), totalOut=txns.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
   const balance=opening+totalIn-totalOut;
   
   let html=`<div class="stmt-container"><div class="stmt-header"><div class="stmt-project-name">${selectedProject.name}</div><div class="stmt-date-range">رصيد أول المدة: ${opening.toLocaleString('ar-EG')} ج</div></div><div class="stmt-summary"><div class="stmt-sum-cell"><div class="stmt-sum-label">📊 إجمالي الوارد</div><div class="stmt-sum-value stmt-in">${totalIn.toLocaleString('ar-EG')}</div></div><div class="stmt-sum-cell"><div class="stmt-sum-label">💸 إجمالي الصادر</div><div class="stmt-sum-value stmt-out">${totalOut.toLocaleString('ar-EG')}</div></div><div class="stmt-sum-cell"><div class="stmt-sum-label">💰 الرصيد الحالي</div><div class="stmt-sum-value ${balance>=0?'stmt-balance':'stmt-out'}">${balance.toLocaleString('ar-EG')}</div></div></div>`;
   if(txns.length){
-    let runBal=opening;
+    // حساب الأرصدة المتراكمة من الأقدم للأحدث ثم عرضها بالعكس
+    let cumulativeBals = [];
+    let tempBal = opening;
+    const txnsAsc = [...txns].sort((a,b)=>new Date(a.date)-new Date(b.date));
+    txnsAsc.forEach(t=>{ const isIn=t.type==='donation'; if(isIn)tempBal+=t.amount; else tempBal-=t.amount; cumulativeBals.push({id:t.id, bal:tempBal}); });
+    const balMap = {};
+    cumulativeBals.forEach(x=>balMap[x.id]=x.bal);
     const rows=txns.map(t=>{
-      const isIn=t.type==='donation'; if(isIn)runBal+=t.amount;else runBal-=t.amount;
+      const isIn=t.type==='donation';
+      const runBal = balMap[t.id] ?? 0;
       let displayDesc = getPrivacyDesc(t);
       return `<tr><td dir="ltr" style="text-align:right;">${formatDate(t.date)}</td><td style="font-weight:bold;">${displayDesc}${t.notes?'<br><small style="color:#777; font-weight:normal;">'+t.notes+'</small>':''}</td><td class="balance-pos">${isIn?t.amount.toLocaleString('ar-EG'):'-'}</td><td class="balance-neg">${!isIn?t.amount.toLocaleString('ar-EG'):'-'}</td><td style="font-weight:bold;">${runBal.toLocaleString('ar-EG')}</td>
-      <td style="display:flex;gap:4px;"><button class="btn btn-warn btn-sm" style="padding:4px 8px;" onclick="openEditTx(${t.id})">✏️</button><button class="btn btn-outline btn-sm" style="padding:4px 8px;" onclick="deleteTx(${t.id})">🗑️</button></td></tr>`;
+      <td style="display:flex;gap:4px;flex-wrap:wrap;">
+        ${(isIn && t.donorId && t.donorId !== 'general') ? `<button class="btn btn-success btn-sm" style="padding:4px 6px;font-size:11px;" title="إرسال رسالة الواتساب" onclick="resendWaFromStmt(${t.id})">📲</button>` : ''}
+        <button class="btn btn-warn btn-sm" style="padding:4px 8px;" onclick="openEditTx(${t.id})">✏️</button>
+        <button class="btn btn-outline btn-sm" style="padding:4px 8px;" onclick="deleteTx(${t.id})">🗑️</button>
+      </td></tr>`;
     }).join('');
     html+=`<div class="table-wrap"><table class="stmt-table"><thead><tr><th>التاريخ</th><th>البيان</th><th>وارد</th><th>صادر</th><th>الرصيد</th><th>إجراء</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   } else { html+=`<div class="empty">لا توجد حركات</div>`; }
@@ -1077,39 +947,7 @@ function showWhatsAppModal(donor, amount, date, project, currentTxId){
   }
   
   let titlePrefix = getGenderLabel(donor.gender || 'M'); if(titlePrefix !== 'جهة/شركة') titlePrefix += '/'; else titlePrefix += ':';
-  const countTxns = db.transactions.filter(t=>t.type==='donation'&&t.donorId===donor.id).length;
-  // كود المتبرع يظهر في الرسالة الشخصية
-  const donorCodeLine = donor.code ? `🆔 كود المساهم: ${donor.code}` : '';
-  const rank = (() => {
-    const totals = {};
-    db.transactions.filter(t=>t.type==='donation'&&t.donorId&&t.donorId!=='general')
-      .forEach(t=>{ totals[t.donorId]=(totals[t.donorId]||0)+t.amount; });
-    const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
-    const idx = sorted.findIndex(([id])=>id==donor.id);
-    return idx>=0 ? idx+1 : null;
-  })();
-  const rankText = rank ? `\n🏅 ترتيبك بين المساهمين: المركز ${rank}` : '';
-  
-  // رسالة شخصية: الاسم الكامل + تفاصيل خاصة
-  const msg=`السلام عليكم ورحمة الله وبركاته 🌿
-
-${titlePrefix} ${donor.name}
-🆔 كودك: ${donor.code}
-
-✅ تم استلام مساهمتكم الكريمة بنجاح
-━━━━━━━━━━━━━━━━━━━━
-📌 المشروع: ${project.name}
-💵 المبلغ: ${amount.toLocaleString('ar-EG')} جنيه
-📅 التاريخ: ${formatDate(date)}
-━━━━━━━━━━━━━━━━━━━━
-💰 إجمالي مساهماتكم: ${totalContributions.toLocaleString('ar-EG')} جنيه
-🔢 عدد مساهماتكم: ${countTxns} مرة${rankText}
-${lastDonsText}
-نسأل الله أن يتقبل منكم ويبارك فيكم 🤲
-جزاكم الله خيراً على سخائكم المستمر 🌿
-
-📈 لمتابعة أثر مساهماتكم:
-${WA_GROUP_LINK}`;
+  const msg=`السلام عليكم ورحمة الله وبركاته 🌿\n\n${titlePrefix} ${donor.name}\n✅ تم استلام مساهمتكم بنجاح في برنامج:\n${project.name}\n\n💵 قيمة المساهمة: ${amount.toLocaleString('ar-EG')} جنيه\n📅 التاريخ: ${formatDate(date)}\n\n🆔 كود المساهم: ${donor.code}\n\n💰 إجمالي مساهماتك حتى الآن: ${totalContributions.toLocaleString('ar-EG')} جنيه\n${lastDonsText}\nنسأل الله أن يتقبل منكم ويجعلها في ميزان حسناتكم 🤲\n\n📈 لمتابعة التقارير الدورية وأثر مساهماتكم:\n${WA_GROUP_LINK}`;
   
   document.getElementById('wa-message-text').textContent=msg;
   currentWaPhone = donor.phone ? donor.phone.replace(/[^0-9]/g,'') : ''; if(currentWaPhone && currentWaPhone.startsWith('0')) currentWaPhone='2'+currentWaPhone;
@@ -1125,7 +963,7 @@ function openWhatsApp(){
 // ==========================================
 function exportStatementPDF() {
   if(!selectedProject) return toast('⚠️ اختر مشروعاً','error');
-  const txns=db.transactions.filter(t=>t.projectId===selectedProject.id).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const txns=db.transactions.filter(t=>t.projectId===selectedProject.id).sort((a,b)=>new Date(b.date)-new Date(a.date));
   
   const opening=selectedProject.openingBalance||0; let runBal=opening; const rows = [];
   txns.forEach(t=>{
@@ -1147,16 +985,8 @@ function exportStatementPDF() {
 // ==========================================
 // 9. رسم الكانفاس (الصور)
 // ==========================================
-function roundRect(ctx, x, y, w, h, r) {
-  if(typeof r==='number') r={tl:r,tr:r,bl:r,br:r};
-  if(!r) r={tl:0,tr:0,bl:0,br:0};
-  const {tl=0,tr=0,bl=0,br=0}=r;
-  ctx.beginPath();
-  ctx.moveTo(x+tl,y); ctx.lineTo(x+w-tr,y); ctx.quadraticCurveTo(x+w,y,x+w,y+tr);
-  ctx.lineTo(x+w,y+h-br); ctx.quadraticCurveTo(x+w,y+h,x+w-br,y+h);
-  ctx.lineTo(x+bl,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-bl);
-  ctx.lineTo(x,y+tl); ctx.quadraticCurveTo(x,y,x+tl,y);
-  ctx.closePath();
+function roundRect(ctx, x, y, width, height, radius) {
+  ctx.beginPath(); ctx.moveTo(x + radius, y); ctx.lineTo(x + width - radius, y); ctx.quadraticCurveTo(x + width, y, x + width, y + radius); ctx.lineTo(x + width, y + height - radius); ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height); ctx.lineTo(x + radius, y + height); ctx.quadraticCurveTo(x, y + height, x, y + height - radius); ctx.lineTo(x, y + radius); ctx.quadraticCurveTo(x, y, x + radius, y); ctx.closePath();
 }
 
 function exportStatementImage(){
@@ -1164,231 +994,70 @@ function exportStatementImage(){
   const txns=db.transactions.filter(t=>t.projectId===selectedProject.id).sort((a,b)=>new Date(a.date)-new Date(b.date));
   const opening=selectedProject.openingBalance||0; let runBal=opening;
   const rows=txns.map(t=>{
-    const isIn=t.type==='donation'; if(isIn)runBal+=t.amount; else runBal-=t.amount;
-    let displayDesc = getPrivacyDesc(t)+(t.notes?' — '+t.notes:'');
-    return {date:formatDate(t.date), desc:displayDesc, inAmt:isIn?t.amount:0, outAmt:!isIn?t.amount:0, balance:runBal};
+    const isIn=t.type==='donation'; if(isIn)runBal+=t.amount;else runBal-=t.amount;
+    let displayDesc = getPrivacyDesc(t) + (t.notes?' — '+t.notes:'');
+    return {date:formatDate(t.date), desc: displayDesc, inAmt:isIn?t.amount:0, outAmt:!isIn?t.amount:0, balance:runBal};
   });
-  const totalIn=txns.filter(t=>t.type==='donation').reduce((s,t)=>s+t.amount,0);
-  const totalOut=txns.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
-  const finalBal=opening+totalIn-totalOut;
-  const MAX_ROWS=25; const displayRows=rows.slice(-MAX_ROWS);
-
-  // أبعاد الكانفاس — محسوبة بدقة بدون صفحة فاضية
-  const DPR=2, W=1400;
-  const HDR=190, CARDS_H=150, TH=52, ROW_H=56, FTR=58;
-  const EMPTY_H = displayRows.length===0 ? 100 : 0;
-  const H = HDR + CARDS_H + TH + (displayRows.length * ROW_H) + EMPTY_H + FTR;
-  const cvs=document.getElementById('export-canvas');
-  cvs.width=W*DPR; cvs.height=H*DPR;
-  cvs.style.width=''; cvs.style.height='';
-  const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
-
-  // ---- خلفية ----
-  ctx.fillStyle='#f0f5f1'; ctx.fillRect(0,0,W,H);
-
-  // ---- هيدر متدرج ----
-  const gHdr=ctx.createLinearGradient(0,0,W,HDR);
-  gHdr.addColorStop(0,'#0a2e1a'); gHdr.addColorStop(0.5,'#1a5c38'); gHdr.addColorStop(1,'#2d8a56');
-  ctx.fillStyle=gHdr; ctx.fillRect(0,0,W,HDR);
-
-  // نمط هندسي خفيف في الهيدر
-  ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1;
-  for(let i=0;i<W;i+=60){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i+30,HDR);ctx.stroke();}
-
-  // أيقونة وعنوان
-  ctx.fillStyle='rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.arc(80,HDR/2,44,0,Math.PI*2); ctx.fill();
-  ctx.font='44px Arial'; ctx.textAlign='center'; ctx.fillText('🌿',80,HDR/2+16);
-
-  ctx.textAlign='right'; ctx.fillStyle='#ffffff';
-  ctx.font='bold 48px Cairo,Arial'; ctx.fillText('كشف حساب تفصيلي',W-40,70);
-  ctx.fillStyle='#ffd166'; ctx.font='bold 34px Cairo,Arial'; ctx.fillText(selectedProject.name,W-40,120);
-  ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='18px Cairo,Arial';
-  const dateLabel='تاريخ الإصدار: '+new Date().toLocaleDateString('ar-EG')+(rows.length>MAX_ROWS?`  |  عرض آخر ${MAX_ROWS} من ${rows.length} حركة`:'  |  إجمالي '+rows.length+' حركة');
-  ctx.fillText(dateLabel,W-40,158);
-
-  // ---- بطاقات الملخص ----
-  const CARD_Y=HDR+20, CARD_W=400, CARD_H=120, CARD_GAP=30;
-  const cardsData=[
-    {label:'إجمالي الوارد',val:totalIn.toLocaleString('ar-EG')+' ج',icon:'📥',bg:'#1a5c38',light:'#e8f5e9',tc:'#1a5c38'},
-    {label:'إجمالي الصادر',val:totalOut.toLocaleString('ar-EG')+' ج',icon:'💸',bg:'#c0392b',light:'#fdecea',tc:'#c0392b'},
-    {label:'الرصيد الحالي',val:finalBal.toLocaleString('ar-EG')+' ج',icon:'💰',bg:finalBal>=0?'#0f3d25':'#7b241c',light:finalBal>=0?'#e8f5e9':'#fdecea',tc:finalBal>=0?'#0f3d25':'#c0392b'},
-  ];
-  const totalCardsW=CARD_W*3+CARD_GAP*2; const cardStartX=(W-totalCardsW)/2;
-  cardsData.forEach((c,i)=>{
-    const cx=cardStartX+i*(CARD_W+CARD_GAP);
-    ctx.shadowColor='rgba(0,0,0,0.12)'; ctx.shadowBlur=20; ctx.shadowOffsetY=8;
-    ctx.fillStyle='#ffffff'; roundRect(ctx,cx,CARD_Y,CARD_W,CARD_H,16); ctx.fill();
-    ctx.shadowColor='transparent'; ctx.shadowBlur=0; ctx.shadowOffsetY=0;
-    // شريط لوني على الجانب الأيمن
-    ctx.fillStyle=c.bg; roundRect(ctx,cx,CARD_Y,8,CARD_H,{tl:16,tr:0,bl:16,br:0}); ctx.fill();
-    ctx.font='28px Arial'; ctx.textAlign='right'; ctx.fillText(c.icon,cx+CARD_W-20,CARD_Y+45);
-    ctx.fillStyle='#5a7a5a'; ctx.font='bold 17px Cairo,Arial'; ctx.fillText(c.label,cx+CARD_W-55,CARD_Y+42);
-    ctx.fillStyle=c.tc; ctx.font='bold 36px Cairo,Arial'; ctx.fillText(c.val,cx+CARD_W-55,CARD_Y+90);
-  });
-
-  // ---- رأس الجدول ----
-  const TY=HDR+CARDS_H+20;
-  const gTh=ctx.createLinearGradient(0,TY,0,TY+TH);
-  gTh.addColorStop(0,'#1a5c38'); gTh.addColorStop(1,'#0f3d25');
-  ctx.fillStyle=gTh; roundRect(ctx,20,TY,W-40,TH,{tl:12,tr:12,bl:0,br:0}); ctx.fill();
-
-  // تعريف الأعمدة (LTR على الكانفاس — نبدأ من اليسار)
-  const MARGIN=20, INNER=W-40;
-  const colDefs=[
-    {label:'الرصيد',  wR:0.14, align:'center', key:'balance'},
-    {label:'صادر',   wR:0.12, align:'center', key:'outAmt'},
-    {label:'وارد',   wR:0.12, align:'center', key:'inAmt'},
-    {label:'البيان', wR:0.44, align:'right',  key:'desc'},
-    {label:'التاريخ',wR:0.18, align:'center', key:'date'},
-  ];
-  let runX=MARGIN;
-  const cols=colDefs.map(c=>{
-    const w=Math.round(INNER*c.wR); const lx=runX; runX+=w;
-    return {...c,lx,w,cx:lx+w/2};
-  });
-
-  ctx.fillStyle='white'; ctx.font='bold 22px Cairo,Arial'; ctx.textAlign='center';
-  cols.forEach((c,i)=>{
-    ctx.fillText(c.label, c.cx, TY+TH/2+8);
-    if(i<cols.length-1){ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(c.lx+c.w,TY+8);ctx.lineTo(c.lx+c.w,TY+TH-8);ctx.stroke();}
-  });
-
-  // ---- صفوف البيانات ----
-  if(displayRows.length===0){
-    ctx.textAlign='center'; ctx.fillStyle='#aaa'; ctx.font='bold 26px Cairo,Arial';
-    ctx.fillText('لا توجد حركات في هذا المشروع',W/2,TY+TH+60);
+  
+  const totalIn=txns.filter(t=>t.type==='donation').reduce((s,t)=>s+t.amount,0), totalOut=txns.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0), finalBal=opening+totalIn-totalOut;
+  const MAX_ROWS=20; const displayRows=rows.slice(-MAX_ROWS);
+  const DPR=2, W=1200, ROW_H=65, HEADER_H=300, FOOTER_H=80; const H = HEADER_H + 90 + (displayRows.length * ROW_H) + FOOTER_H + (displayRows.length===0 ? 100 : 0);
+  
+  const cvs=document.getElementById('export-canvas'); cvs.width=W*DPR; cvs.height=H*DPR; const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
+  ctx.fillStyle='#f8fbf8'; ctx.fillRect(0,0,W,H); ctx.fillStyle = '#0f3d25'; ctx.fillRect(0,0,W, HEADER_H - 100);
+  
+  ctx.textAlign='center'; ctx.fillStyle='white'; ctx.font='bold 50px Cairo,Arial'; ctx.fillText('كشف حساب تفصيلي', W/2, 80); ctx.fillStyle='#ffd166'; ctx.font='bold 38px Cairo,Arial'; ctx.fillText('⭐ ' + selectedProject.name, W/2, 140); ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='20px Cairo,Arial'; ctx.fillText('تاريخ الإصدار: ' + new Date().toLocaleDateString('ar-EG') + (rows.length>MAX_ROWS ? ` (عرض آخر ${MAX_ROWS} حركة)` : ''), W/2, 180);
+  
+  const cw = 360, cGap = 40, startX = (W - (cw*3 + cGap*2))/2;
+  const cards = [ {title: 'الرصيد الحالي 💰', val: finalBal.toLocaleString('ar-EG') + ' ج', color: finalBal>=0?'#1a5c38':'#c0392b'}, {title: 'إجمالي الصادر 💸', val: totalOut.toLocaleString('ar-EG') + ' ج', color: '#c0392b'}, {title: 'إجمالي الوارد 📥', val: totalIn.toLocaleString('ar-EG') + ' ج', color: '#27ae60'} ];
+  
+  ctx.shadowColor = 'rgba(0,0,0,0.08)'; ctx.shadowBlur = 20; ctx.shadowOffsetY = 10;
+  cards.forEach((c, i) => { const x = startX + i*(cw+cGap); ctx.fillStyle = 'white'; ctx.beginPath(); ctx.roundRect(x, HEADER_H-100, cw, 130, 16); ctx.fill(); ctx.shadowColor = 'transparent'; ctx.textAlign = 'center'; ctx.fillStyle = '#444'; ctx.font = 'bold 20px Cairo,Arial'; ctx.fillText(c.title, x + cw/2, HEADER_H-50); ctx.fillStyle = c.color; ctx.font = 'bold 36px Cairo,Arial'; ctx.fillText(c.val, x + cw/2, HEADER_H+5); ctx.shadowColor = 'rgba(0,0,0,0.08)'; }); ctx.shadowColor = 'transparent';
+  
+  const TY = HEADER_H + 80; const colX = [W-60, W-250, W-750, W-950, 100]; 
+  ctx.fillStyle='#e8efe9'; ctx.beginPath(); ctx.roundRect(40, TY, W-80, 60, 10); ctx.fill(); ctx.fillStyle='#1a5c38'; ctx.font='bold 24px Cairo,Arial'; 
+  ctx.textAlign='right'; ctx.fillText('التاريخ', colX[0], TY+40); ctx.textAlign='right'; ctx.fillText('البيان', colX[1], TY+40); ctx.textAlign='left'; ctx.fillText('وارد', colX[2], TY+40); ctx.textAlign='left'; ctx.fillText('صادر', colX[3], TY+40); ctx.textAlign='left'; ctx.fillText('الرصيد', colX[4], TY+40);
+  
+  if(displayRows.length === 0) {
+      ctx.textAlign='center'; ctx.fillStyle='#888'; ctx.font='bold 28px Cairo,Arial'; ctx.fillText('لا توجد حركات في هذا المشروع', W/2, TY + 120);
   } else {
-    displayRows.forEach((r,i)=>{
-      const ry=TY+TH+i*ROW_H;
-      ctx.fillStyle=i%2===0?'#ffffff':'#f4faf5';
-      if(i===displayRows.length-1) roundRect(ctx,MARGIN,ry,INNER,ROW_H,{tl:0,tr:0,bl:12,br:12});
-      else ctx.fillRect(MARGIN,ry,INNER,ROW_H);
-      ctx.fill();
-      // فاصل صف
-      ctx.strokeStyle='#ddeedd'; ctx.lineWidth=0.8;
-      ctx.beginPath(); ctx.moveTo(MARGIN,ry+ROW_H); ctx.lineTo(MARGIN+INNER,ry+ROW_H); ctx.stroke();
-
-      cols.forEach((c,ci)=>{
-        let val=r[c.key]; let color='#1a2e1a'; let font='20px Cairo,Arial';
-        if(c.key==='inAmt'){
-          if(!val){val='—';color='#c8d8c8';}
-          else{val=val.toLocaleString('ar-EG');color='#1a7a40';font='bold 20px Cairo,Arial';}
-        } else if(c.key==='outAmt'){
-          if(!val){val='—';color='#c8d8c8';}
-          else{val=val.toLocaleString('ar-EG');color='#c0392b';font='bold 20px Cairo,Arial';}
-        } else if(c.key==='balance'){
-          val=val.toLocaleString('ar-EG');
-          color=r.balance>=0?'#0f3d25':'#c0392b'; font='bold 22px Cairo,Arial';
-        } else if(c.key==='date'){
-          color='#3a5a3a'; font='19px Cairo,Arial';
-        } else if(c.key==='desc'){
-          const maxC=Math.floor(c.w/11.5);
-          if(val.length>maxC) val=val.substring(0,maxC-1)+'…';
-          color='#1a2e1a'; font='19px Cairo,Arial';
-        }
-        ctx.fillStyle=color; ctx.font=font;
-        ctx.textAlign=c.align==='right'?'right':'center';
-        const tx=c.align==='right'?(c.lx+c.w-12):c.cx;
-        ctx.fillText(String(val), tx, ry+ROW_H/2+8);
-        // فاصل عمود
-        if(ci<cols.length-1){ctx.strokeStyle='#e8f0e8';ctx.lineWidth=0.6;ctx.beginPath();ctx.moveTo(c.lx+c.w,ry+6);ctx.lineTo(c.lx+c.w,ry+ROW_H-6);ctx.stroke();}
+      displayRows.forEach((r,i)=>{
+        const ry = TY + 80 + (i*ROW_H);
+        if(i % 2 === 0) { ctx.fillStyle = '#ffffff'; ctx.fillRect(40, ry-25, W-80, ROW_H); }
+        ctx.fillStyle='#333'; ctx.font='bold 22px Cairo,Arial'; 
+        ctx.textAlign='right'; ctx.fillText(r.date, colX[0], ry+15);
+        let desc = r.desc; if(desc.length > 45) desc = desc.substring(0,45)+'...'; ctx.fillText(desc, colX[1], ry+15);
+        ctx.textAlign='left'; ctx.fillStyle='#27ae60'; ctx.fillText(r.inAmt?r.inAmt.toLocaleString('ar-EG'):'-', colX[2], ry+15); ctx.fillStyle='#c0392b'; ctx.fillText(r.outAmt?r.outAmt.toLocaleString('ar-EG'):'-', colX[3], ry+15); ctx.fillStyle= r.balance>=0 ? '#1a5c38' : '#c0392b'; ctx.font='bold 24px Cairo,Arial'; ctx.fillText(r.balance.toLocaleString('ar-EG'), colX[4], ry+15);
       });
-    });
   }
-
-  // ---- فوتر ----
-  const FY=TY+TH+(displayRows.length||1)*ROW_H+20;
-  ctx.fillStyle='rgba(26,92,56,0.08)'; ctx.fillRect(0,FY,W,FTR);
-  ctx.textAlign='center'; ctx.fillStyle='#5a7a5a'; ctx.font='bold 18px Cairo,Arial';
-  ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿  —  جزاكم الله خيراً',W/2,FY+FTR/2+8);
-
-  const img=document.getElementById('img-preview');
-  img.src=cvs.toDataURL('image/png');
-  currentDownloadName='كشف_حساب_'+selectedProject.name+'.png';
-  document.getElementById('img-modal').classList.add('open');
+  ctx.textAlign='center'; ctx.fillStyle='#88a888'; ctx.font='bold 18px Cairo,Arial'; ctx.fillText('تم استخراج هذا التقرير آلياً بواسطة نظام إدارة التبرعات 🌿', W/2, H - 40);
+  
+  const img=document.getElementById('img-preview'); img.src=cvs.toDataURL('image/png'); currentDownloadName = 'كشف_حساب_'+selectedProject.name+'.png'; document.getElementById('img-modal').classList.add('open');
 }
 
 function exportActiveProjectsImage() {
-  const activeProjects = db.projects.filter(p => !p.isArchived && !p.isPrivate);
-  if(!activeProjects.length) return toast('⚠️ لا توجد مشاريع فعالة لعرضها', 'error');
-
-  const DPR=2, W=1100, HDR=220, CARD_H=96, GAP=16, M=50;
-  const totalIn=db.transactions.filter(t=>t.type==='donation').reduce((s,t)=>s+t.amount,0);
-  const H = HDR + (activeProjects.length*(CARD_H+GAP)) + 160;
-  const cvs=document.getElementById('export-canvas');
-  cvs.width=W*DPR; cvs.height=H*DPR;
-  const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
-
-  // خلفية
-  ctx.fillStyle='#f0f5f1'; ctx.fillRect(0,0,W,H);
-
-  // هيدر
-  const gH=ctx.createLinearGradient(0,0,W,HDR);
-  gH.addColorStop(0,'#0a2e1a'); gH.addColorStop(1,'#2d8a56');
-  ctx.fillStyle=gH; roundRect(ctx,0,0,W,HDR,0); ctx.fill();
-
-  // نص هيدر
-  ctx.font='32px Arial'; ctx.textAlign='center'; ctx.fillText('📋',W/2-180,HDR/2+12);
-  ctx.fillStyle='#ffffff'; ctx.font='bold 44px Cairo,Arial';
-  ctx.fillText('تقرير المشاريع الفعالة',W/2+20,HDR/2-10);
-  ctx.fillStyle='#ffd166'; ctx.font='bold 22px Cairo,Arial';
-  ctx.fillText('عدد المشاريع: '+activeProjects.length+'  |  '+new Date().toLocaleDateString('ar-EG'),W/2+20,HDR/2+36);
-
-  let y=HDR+24, total=0;
-  activeProjects.forEach((p,idx)=>{
-    const bal=getProjectBalance(p.id); total+=bal;
-    const txCount=db.transactions.filter(t=>t.projectId===p.id).length;
-    const pIn=db.transactions.filter(t=>t.projectId===p.id&&t.type==='donation').reduce((s,t)=>s+t.amount,0);
-
-    // بطاقة المشروع
-    ctx.shadowColor='rgba(0,0,0,0.08)'; ctx.shadowBlur=14; ctx.shadowOffsetY=5;
-    ctx.fillStyle='#ffffff'; roundRect(ctx,M,y,W-M*2,CARD_H,14); ctx.fill();
-    ctx.shadowColor='transparent'; ctx.shadowBlur=0; ctx.shadowOffsetY=0;
-
-    // شريط ترقيم على اليمين
-    const barColor=bal>=0?'#1a5c38':'#c0392b';
-    ctx.fillStyle=barColor; roundRect(ctx,W-M-8,y,8,CARD_H,{tl:0,tr:14,bl:0,br:14}); ctx.fill();
-
-    // رقم المشروع
-    ctx.fillStyle='#e8f5e9'; ctx.beginPath(); ctx.arc(M+44,y+CARD_H/2,30,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#1a5c38'; ctx.font='bold 28px Cairo,Arial'; ctx.textAlign='center';
-    ctx.fillText(idx+1, M+44, y+CARD_H/2+10);
-
-    // اسم المشروع
-    ctx.textAlign='right'; ctx.fillStyle='#0f3d25'; ctx.font='bold 28px Cairo,Arial';
-    ctx.fillText(p.name, W-M-24, y+42);
-
-    // تفاصيل
-    ctx.fillStyle='#7a9a7a'; ctx.font='18px Cairo,Arial';
-    ctx.fillText('وارد: '+pIn.toLocaleString('ar-EG')+' ج  |  '+txCount+' حركة', W-M-24, y+74);
-
-    // الرصيد
-    ctx.textAlign='left'; ctx.fillStyle=barColor; ctx.font='bold 34px Cairo,Arial';
-    ctx.fillText(bal.toLocaleString('ar-EG')+' ج', M+90, y+CARD_H/2+12);
-
-    y+=CARD_H+GAP;
+  const activeProjects = db.projects.filter(p => !p.isArchived && !p.isPrivate); if(!activeProjects.length) return toast('⚠️ لا توجد مشاريع فعالة لعرضها', 'error');
+  const DPR=2, W=1100, HEADER_H=200, CARD_H=80, ROW_GAP=20, MARGIN=60; const H = HEADER_H + (activeProjects.length * (CARD_H + ROW_GAP)) + 140;
+  const cvs=document.getElementById('export-canvas'); cvs.width=W*DPR; cvs.height=H*DPR; const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
+  
+  ctx.fillStyle='#f0f4f0'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#0f3d25'; ctx.beginPath(); ctx.roundRect(MARGIN, MARGIN, W-(MARGIN*2), 110, 16); ctx.fill(); ctx.textAlign='center'; ctx.fillStyle='white'; ctx.font='bold 40px Cairo,Arial'; ctx.fillText('تقرير المشاريع الفعالة', W/2, MARGIN + 55); ctx.fillStyle='#ffd166'; ctx.font='bold 22px Cairo,Arial'; ctx.fillText('إجمالي عدد المشاريع: ' + activeProjects.length, W/2, MARGIN + 90);
+  
+  let startY = MARGIN + 140, totalBalances = 0;
+  activeProjects.forEach(p => {
+      const bal = getProjectBalance(p.id); totalBalances += bal;
+      ctx.shadowColor = 'rgba(0,0,0,0.05)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.roundRect(MARGIN, startY, W-(MARGIN*2), CARD_H, 12); ctx.fill(); ctx.shadowColor = 'transparent';
+      ctx.textAlign='right'; ctx.fillStyle='#1a5c38'; ctx.font='bold 28px Cairo,Arial'; ctx.fillText(p.name, W - MARGIN - 30, startY + 50);
+      ctx.textAlign='left'; ctx.fillStyle= bal>=0 ? '#27ae60' : '#c0392b'; ctx.font='bold 32px Cairo,Arial'; ctx.fillText(bal.toLocaleString('ar-EG') + ' ج', MARGIN + 30, startY + 52);
+      ctx.strokeStyle='#eee'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(MARGIN + 250, startY + CARD_H/2); ctx.lineTo(W - MARGIN - 350, startY + CARD_H/2); ctx.stroke();
+      startY += CARD_H + ROW_GAP;
   });
-
-  // صندوق الإجمالي
-  y+=14;
-  const gSum=ctx.createLinearGradient(M,y,W-M,y);
-  gSum.addColorStop(0,'#0f3d25'); gSum.addColorStop(1,'#1a5c38');
-  ctx.fillStyle=gSum; roundRect(ctx,M,y,W-M*2,88,16); ctx.fill();
-  ctx.textAlign='right'; ctx.fillStyle='#ffd166'; ctx.font='bold 28px Cairo,Arial';
-  ctx.fillText('إجمالي أرصدة المشاريع الفعالة',W-M-24,y+38);
-  ctx.textAlign='left'; ctx.fillStyle='white'; ctx.font='bold 38px Cairo,Arial';
-  ctx.fillText(total.toLocaleString('ar-EG')+' ج', M+24, y+58);
-  ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='16px Cairo,Arial';
-  ctx.fillText('إجمالي التبرعات الكلية: '+totalIn.toLocaleString('ar-EG')+' ج', W/2, y+84);
-
-  // فوتر
-  ctx.fillStyle='#7a9a7a'; ctx.font='bold 18px Cairo,Arial'; ctx.textAlign='center';
-  ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿', W/2, H-20);
-
-  const img=document.getElementById('img-preview');
-  img.src=cvs.toDataURL('image/png');
-  currentDownloadName='تقرير_المشاريع_الفعالة.png';
-  document.getElementById('img-modal').classList.add('open');
+  
+  ctx.fillStyle='#e8f5e9'; ctx.beginPath(); ctx.roundRect(MARGIN, startY+20, W-(MARGIN*2), 80, 12); ctx.fill();
+  ctx.textAlign='right'; ctx.fillStyle='#0f3d25'; ctx.font='bold 28px Cairo,Arial'; ctx.fillText('إجمالي أرصدة المشاريع الفعالة:', W - MARGIN - 30, startY + 70);
+  ctx.textAlign='left'; ctx.fillStyle= totalBalances >= 0 ? '#1a5c38' : '#c0392b'; ctx.font='bold 34px Cairo,Arial'; ctx.fillText(totalBalances.toLocaleString('ar-EG') + ' ج', MARGIN + 30, startY + 72);
+  
+  const img=document.getElementById('img-preview'); img.src=cvs.toDataURL('image/png'); currentDownloadName = 'تقرير_المشاريع_الفعالة.png'; document.getElementById('img-modal').classList.add('open');
 }
 
 // ----------------------------------------------------
@@ -1408,9 +1077,10 @@ function generateSixMonthsReport() {
     last6Months.push({ m, y, label: `${m}/${y}`, key: `${y}-${String(m).padStart(2,'0')}` });
   }
 
-  // فلترة الحركات بناءً على الـ 6 شهور
+  // فلترة الحركات بناءً على الـ 6 شهور — بدون الصناديق الخاصة
   const startKey = last6Months[0].key;
-  const txns = db.transactions.filter(t => t.date && t.date >= startKey);
+  const _privateSet = new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
+  const txns = db.transactions.filter(t => t.date && t.date >= startKey && !_privateSet.has(t.projectId));
   if(!txns.length) return toast('⚠️ لا توجد حركات مسجلة في آخر 6 شهور', 'error');
 
   const monthlyStats = {}; last6Months.forEach(x => monthlyStats[x.key] = { in: 0, out: 0, donors: new Set() });
@@ -1453,20 +1123,12 @@ function generateSixMonthsReport() {
   const cvs = document.getElementById('export-canvas'); cvs.width = W*DPR; cvs.height = H*DPR;
   const ctx = cvs.getContext('2d'); ctx.scale(DPR,DPR);
 
-  // خلفية
-  ctx.fillStyle='#f0f5f1'; ctx.fillRect(0,0,W,H);
-
-  // هيدر متدرج
-  const gHdr=ctx.createLinearGradient(0,0,W,HEADER_H);
-  gHdr.addColorStop(0,'#0a2e1a'); gHdr.addColorStop(0.5,'#1a5c38'); gHdr.addColorStop(1,'#2d8a56');
-  ctx.fillStyle=gHdr; ctx.fillRect(0,0,W,HEADER_H);
-  // نمط خطوط خفيفة
-  ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1;
-  for(let i=0;i<W;i+=70){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i-40,HEADER_H);ctx.stroke();}
-
+  ctx.fillStyle='#f9fcf9'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = '#0f3d25'; ctx.fillRect(0,0,W, HEADER_H);
+  
   ctx.textAlign='center'; ctx.fillStyle='white'; 
-  ctx.font='bold 52px Cairo,Arial'; ctx.fillText('📊 حصاد مساهمات آخر 6 شهور', W/2, 78);
-  ctx.fillStyle='#ffd166'; ctx.font='bold 26px Cairo,Arial'; ctx.fillText('عرض تفصيلي للمساهمين — الوارد والمصروفات والصافي', W/2, 128);
+  ctx.font='bold 50px Cairo,Arial'; ctx.fillText(`📊 حصاد مساهمات آخر 6 شهور`, W/2, 75);
+  ctx.fillStyle='#ffd166'; ctx.font='bold 24px Cairo,Arial'; ctx.fillText('عرض تفصيلي للمساهمين وإجمالي الوارد والمصروفات', W/2, 125);
 
   const TY = HEADER_H + 30;
   const codeWidth = 250, totalWidth = 200;
@@ -1479,59 +1141,43 @@ function generateSixMonthsReport() {
   last6Months.forEach((m, i) => { monthXs[i] = W - 30 - codeWidth - (i)*monthColW; });
 
   // رأس الجدول
-  const gTH=ctx.createLinearGradient(0,TY,0,TY+60);
-  gTH.addColorStop(0,'#1a5c38'); gTH.addColorStop(1,'#0f3d25');
-  ctx.fillStyle=gTH; ctx.beginPath(); ctx.roundRect(20, TY, W-40, 60, {tl:10,tr:10,bl:0,br:0}); ctx.fill();
+  ctx.fillStyle='#1a5c38'; ctx.beginPath(); ctx.roundRect(20, TY, W-40, 60, 10); ctx.fill();
   ctx.fillStyle='white'; ctx.font='bold 24px Cairo,Arial';
   
-  ctx.textAlign = 'right'; ctx.fillText('المساهم', colCodeX - 20, TY + 40);
+  ctx.textAlign = 'right'; ctx.fillText('المساهم (الكود)', colCodeX - 20, TY + 40);
   ctx.textAlign = 'center';
   last6Months.forEach((m, i) => { ctx.fillText(m.label, monthXs[i] - monthColW/2, TY + 40); });
-  ctx.fillStyle='#ffd166'; ctx.font='bold 26px Cairo,Arial';
-  ctx.fillText('الإجمالي ج', colTotalX - totalWidth/2, TY + 40);
+  ctx.fillText('الإجمالي (ج)', colTotalX - totalWidth/2, TY + 40);
 
   let currentY = TY + 65;
   let overallTotalIn = 0;
 
-  let rowIdx=0;
   function drawMatrixRow(label, statsObj, isHighlight) {
-      // خلفية الصف
-      ctx.fillStyle = isHighlight ? '#fffcf0' : (rowIdx%2===0?'#ffffff':'#f5fbf6');
-      ctx.fillRect(20, currentY, W-40, ROW_H);
+      if(isHighlight) { ctx.fillStyle = '#fffcf0'; ctx.fillRect(20, currentY, W-40, ROW_H); }
+      else { ctx.fillStyle = '#ffffff'; ctx.fillRect(20, currentY, W-40, ROW_H); }
+      
+      ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1; ctx.beginPath();
+      ctx.moveTo(20, currentY + ROW_H); ctx.lineTo(W-20, currentY + ROW_H); ctx.stroke();
 
-      // فاصل أسفل الصف
-      ctx.strokeStyle='#ddeedd'; ctx.lineWidth=0.8;
-      ctx.beginPath(); ctx.moveTo(20,currentY+ROW_H); ctx.lineTo(W-20,currentY+ROW_H); ctx.stroke();
-
-      // اسم المساهم
-      if(isHighlight){
-        ctx.fillStyle='#f0a500'; ctx.fillRect(20,currentY,6,ROW_H);
-      } else {
-        ctx.fillStyle='#1a5c38'; ctx.fillRect(20,currentY,4,ROW_H);
-      }
-      ctx.fillStyle='#0f3d25'; ctx.font=isHighlight?'bold 26px Cairo,Arial':'bold 23px Cairo,Arial';
-      ctx.textAlign='right'; ctx.fillText(label, colCodeX-24, currentY+40);
-
-      // قيم الأشهر
-      ctx.font='bold 23px Cairo,Arial';
-      last6Months.forEach((m,i)=>{
-          const val=statsObj[m.key]||0;
-          if(val>0){ctx.fillStyle='#1a7a40';ctx.fillText(val.toLocaleString('ar-EG'),monthXs[i]-monthColW/2,currentY+40);}
-          else{ctx.fillStyle='#ccc';ctx.fillText('—',monthXs[i]-monthColW/2,currentY+40);}
+      ctx.fillStyle = '#111'; ctx.font = isHighlight ? 'bold 24px Cairo,Arial' : 'bold 22px Cairo,Arial';
+      ctx.textAlign = 'right'; ctx.fillText(label, colCodeX - 20, currentY + 40);
+      
+      ctx.textAlign = 'center'; ctx.fillStyle = '#27ae60'; ctx.font = 'bold 24px Cairo,Arial';
+      last6Months.forEach((m, i) => {
+          const val = statsObj[m.key] || 0;
+          if(val > 0) ctx.fillText(val.toLocaleString('ar-EG'), monthXs[i] - monthColW/2, currentY + 40);
+          else { ctx.fillStyle = '#ccc'; ctx.fillText('-', monthXs[i] - monthColW/2, currentY + 40); ctx.fillStyle = '#27ae60'; }
       });
-      ctx.textAlign='center';
-
-      // الإجمالي
-      ctx.fillStyle=isHighlight?'#d35400':'#0f3d25'; ctx.font='bold 27px Cairo,Arial';
-      ctx.fillText(statsObj.total.toLocaleString('ar-EG'), colTotalX-totalWidth/2, currentY+40);
-      currentY+=ROW_H; rowIdx++;
+      
+      ctx.fillStyle = '#1a5c38'; ctx.font = 'bold 26px Cairo,Arial';
+      ctx.fillText(statsObj.total.toLocaleString('ar-EG'), colTotalX - totalWidth/2, currentY + 40);
+      currentY += ROW_H;
   }
 
-  if(hasGeneral) drawMatrixRow('✨ إيراد عام', donorStats['general'], true);
+  if(hasGeneral) drawMatrixRow('🌟 إيراد عام', donorStats['general'], true);
   sortedDonorIds.forEach(dId => {
       const d = db.donors.find(x=>x.id == dId);
-      // تقرير الجروب: الكود فقط (لا يُكشف الاسم)
-      const label = d ? d.code : '???';
+      const label = d ? d.code : 'غير معروف';
       drawMatrixRow(label, donorStats[dId], false);
   });
 
@@ -1546,38 +1192,25 @@ function generateSixMonthsReport() {
   });
   ctx.fillText(overallTotalIn.toLocaleString('ar-EG'), colTotalX - totalWidth/2, currentY + 42);
   
-  currentY += ROW_H + 30;
-
-  // صندوق الملخص الشهري
-  const gSum=ctx.createLinearGradient(40,currentY,W-40,currentY);
-  gSum.addColorStop(0,'#0a2e1a'); gSum.addColorStop(1,'#1a5c38');
-  ctx.fillStyle=gSum; ctx.beginPath(); ctx.roundRect(40,currentY,W-80,summaryBoxH,16); ctx.fill();
-
-  ctx.fillStyle='white'; ctx.textAlign='center'; ctx.font='bold 32px Cairo,Arial';
-  ctx.fillText('📝 ملخص الشهور الفعالة',W/2,currentY+46);
-
-  // خط فاصل
-  ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(80,currentY+60); ctx.lineTo(W-80,currentY+60); ctx.stroke();
+  currentY += ROW_H + 40;
+  ctx.fillStyle = '#0f3d25'; ctx.beginPath(); ctx.roundRect(40, currentY, W-80, summaryBoxH, 12); ctx.fill();
+  ctx.fillStyle = 'white'; ctx.textAlign = 'center'; ctx.font = 'bold 30px Cairo,Arial';
+  ctx.fillText('📝 ملخص حركة الشهور الفعالة', W/2, currentY + 45);
   
-  currentY += 80;
-  ctx.textAlign='right'; ctx.font='bold 21px Cairo,Arial';
+  currentY += 85;
+  ctx.textAlign = 'right'; ctx.font = 'bold 22px Cairo,Arial';
   
-  activeMonthsKeys.forEach((k,ki) => {
-      const parts=k.split('-'); const label=`${parts[1]}/${parts[0]}`;
-      const cIn=monthlyStats[k].in, cOut=monthlyStats[k].out, count=monthlyStats[k].donors.size;
-      const net=cIn-cOut;
-      // تلوين الصافي
-      const netColor=net>=0?'#a8e6c0':'#f5a8a8';
-      ctx.fillStyle=netColor; ctx.font='bold 21px Cairo,Arial';
-      const line=`🗓️ ${label}  ←  ${count} مساهم  |  وارد: ${cIn.toLocaleString('ar-EG')} ج  |  صادر: ${cOut.toLocaleString('ar-EG')} ج  |  صافي: ${net.toLocaleString('ar-EG')} ج`;
-      ctx.fillText(line,W-80,currentY);
-      currentY+=40;
+  activeMonthsKeys.forEach(k => {
+      const parts = k.split('-'); const label = `${parts[1]}/${parts[0]}`;
+      const cIn = monthlyStats[k].in, cOut = monthlyStats[k].out, count = monthlyStats[k].donors.size;
+      const net = cIn - cOut;
+      const line = `🗓️ شهر ${label}: ساهم (${count}) مساهم بإجمالي وارد [ ${cIn.toLocaleString('ar-EG')} ج ]  |  المصروفات: [ ${cOut.toLocaleString('ar-EG')} ج ]  |  الصافي: [ ${net.toLocaleString('ar-EG')} ج ]`;
+      ctx.fillText(line, W - 80, currentY);
+      currentY += 40;
   });
 
-  // فوتر
-  ctx.textAlign='center'; ctx.fillStyle='#7a9a7a'; ctx.font='bold 20px Cairo,Arial';
-  ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿  —  جزاكم الله خيراً', W/2, H-24);
+  ctx.textAlign='center'; ctx.fillStyle='#88a888'; ctx.font='bold 18px Cairo,Arial';
+  ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿', W/2, H - 20);
 
   const img=document.getElementById('img-preview'); img.src=cvs.toDataURL('image/png');
   currentDownloadName = `تقرير_حصاد_6شهور.png`;
@@ -1601,391 +1234,102 @@ async function shareImageToWhatsApp() {
 }
 
 
-// ============================================================
-// 🏆 تقرير أبطال التبرع — آخر 6 شهور — أكواد فقط
-// ============================================================
-function generateTopDonorsReport() {
-  // آخر 6 شهور فقط
-  const now=new Date();
-  const last6Keys=[];
-  for(let i=5;i>=0;i--){
-    let m=now.getMonth()+1-i, y=now.getFullYear();
-    if(m<=0){m+=12;y--;}
-    last6Keys.push(`${y}-${String(m).padStart(2,'0')}`);
-  }
-
-  const donorTotals={};
-  db.transactions
-    .filter(t=>t.type==='donation'&&t.donorId&&t.donorId!=='general'&&t.date&&last6Keys.some(k=>t.date.startsWith(k)))
-    .forEach(t=>{donorTotals[t.donorId]=(donorTotals[t.donorId]||0)+t.amount;});
-
-  const sorted=Object.entries(donorTotals)
-    .map(([id,total])=>({donor:db.donors.find(d=>d.id==id),total}))
-    .filter(x=>x.donor).sort((a,b)=>b.total-a.total).slice(0,10);
-  if(!sorted.length) return toast('⚠️ لا توجد بيانات في آخر 6 شهور','error');
-
-  const overallTotal=sorted.reduce((s,x)=>s+x.total,0);
-  // أبعاد واضحة — كل بطاقة 100px
-  const DPR=2, W=1100, HDR=180, CARD=100, GAP=12, M=40, FTR=70;
-  const H=HDR+(sorted.length*(CARD+GAP))+GAP+FTR;
-  const cvs=document.getElementById('export-canvas');
-  cvs.width=W*DPR; cvs.height=H*DPR;
-  const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
-
-  ctx.fillStyle='#f2f7f3'; ctx.fillRect(0,0,W,H);
-
-  // هيدر
-  const gH=ctx.createLinearGradient(0,0,W,0);
-  gH.addColorStop(0,'#0a2e1a'); gH.addColorStop(1,'#2d8a56');
-  ctx.fillStyle=gH; ctx.fillRect(0,0,W,HDR);
-  ctx.font='46px Arial'; ctx.textAlign='center'; ctx.fillText('🏆',70,HDR/2+16);
-  ctx.fillStyle='white'; ctx.font='bold 46px Cairo,Arial'; ctx.textAlign='center';
-  ctx.fillText('أبطال التبرع — آخر 6 شهور',W/2,HDR/2-4);
-  ctx.fillStyle='#ffd166'; ctx.font='bold 20px Cairo,Arial';
-  ctx.fillText('إجمالي الفترة: '+overallTotal.toLocaleString('ar-EG')+' ج  |  '+new Date().toLocaleDateString('ar-EG'),W/2,HDR/2+34);
-
-  const medals=['🥇','🥈','🥉'];
-  const rankColors=['#c8860a','#7a8a8a','#8a5a2a'];
-  let y=HDR+GAP;
-
-  sorted.forEach((item,idx)=>{
-    const pct=overallTotal>0?item.total/overallTotal:0;
-    const txCount=db.transactions.filter(t=>t.type==='donation'&&t.donorId===item.donor.id&&last6Keys.some(k=>t.date&&t.date.startsWith(k))).length;
-
-    // خلفية البطاقة
-    ctx.shadowColor='rgba(0,0,0,0.07)'; ctx.shadowBlur=10; ctx.shadowOffsetY=4;
-    ctx.fillStyle=idx===0?'#fffdf0':idx===1?'#f8f9fa':idx===2?'#fdf6f0':'white';
-    roundRect(ctx,M,y,W-M*2,CARD,14); ctx.fill();
-    ctx.shadowColor='transparent'; ctx.shadowBlur=0;
-
-    // ===== منطقة اليمين: الترتيب + الكود =====
-    const rightW=240;  // عرض ثابت لمنطقة اليمين
-    // شريط لوني على أقصى اليمين
-    const sColor=idx<3?rankColors[idx]:'#1a5c38';
-    ctx.fillStyle=sColor; roundRect(ctx,W-M-8,y,8,CARD,{tl:0,tr:14,bl:0,br:14}); ctx.fill();
-
-    // رقم/ميدالية
-    if(idx<3){
-      ctx.font='44px Arial'; ctx.textAlign='center';
-      ctx.fillText(medals[idx],W-M-50,y+CARD/2+14);
-    } else {
-      ctx.fillStyle='#e0e0e0'; roundRect(ctx,W-M-70,y+22,50,CARD-44,10); ctx.fill();
-      ctx.fillStyle='#666'; ctx.font='bold 22px Cairo,Arial'; ctx.textAlign='center';
-      ctx.fillText(idx+1,W-M-45,y+CARD/2+8);
-    }
-
-    // الكود (تقرير جروب — بدون اسم)
-    ctx.textAlign='right'; ctx.fillStyle='#0f3d25'; ctx.font='bold 32px Cairo,Arial';
-    ctx.fillText(item.donor.code,W-M-80,y+38);
-    ctx.fillStyle='#8a9a8a'; ctx.font='17px Cairo,Arial';
-    ctx.fillText(txCount+' مرة  |  '+Math.round(pct*100)+'%',W-M-80,y+66);
-
-    // ===== منطقة اليسار: المبلغ =====
-    const leftW=180;
-    ctx.textAlign='left'; ctx.fillStyle=sColor; ctx.font='bold 34px Cairo,Arial';
-    ctx.fillText(item.total.toLocaleString('ar-EG')+' ج',M+14,y+42);
-
-    // ===== شريط التقدم في المنتصف =====
-    const barL=M+leftW+10, barR=W-M-rightW-10;
-    const barTotalW=barR-barL, barFilledW=Math.max(Math.round(barTotalW*pct),8);
-    const barY=y+CARD/2-10;
-    // خلفية الشريط
-    ctx.fillStyle='#e0ece0'; roundRect(ctx,barL,barY,barTotalW,22,11); ctx.fill();
-    // الشريط الممتلئ
-    const gBar=ctx.createLinearGradient(barL,0,barL+barFilledW,0);
-    gBar.addColorStop(0,sColor); gBar.addColorStop(1,idx===0?'#f0c840':idx<3?'#aab8aa':'#3d8a5c');
-    ctx.fillStyle=gBar; roundRect(ctx,barL,barY,barFilledW,22,11); ctx.fill();
-    // نسبة داخل الشريط
-    if(barFilledW>50){
-      ctx.fillStyle='white'; ctx.font='bold 14px Cairo,Arial'; ctx.textAlign='center';
-      ctx.fillText(Math.round(pct*100)+'%',barL+barFilledW/2,barY+16);
-    }
-
-    y+=CARD+GAP;
-  });
-
-  // فوتر
-  ctx.fillStyle='#eaf2ea'; ctx.fillRect(0,y+4,W,FTR-4);
-  ctx.fillStyle='#5a7a5a'; ctx.font='bold 19px Cairo,Arial'; ctx.textAlign='center';
-  ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿  —  جزاكم الله خيراً',W/2,y+4+FTR/2+7);
-
-  const img=document.getElementById('img-preview');
-  img.src=cvs.toDataURL('image/png');
-  currentDownloadName='تقرير_أبطال_التبرع.png';
-  document.getElementById('img-modal').classList.add('open');
-}
-
-// ============================================================
-// 📈 تقرير منحنى النمو الشهري — الوارد والصادر والصافي
-// ============================================================
-function generateMonthlyTrendReport() {
-  const now=new Date();
-  const months=[];
-  for(let i=11;i>=0;i--){
-    let m=now.getMonth()+1-i, y=now.getFullYear();
-    if(m<=0){m+=12;y--;}
-    months.push({label:`${m}/${y}`,key:`${y}-${String(m).padStart(2,'0')}`,m,y});
-  }
-  const hasTxns=db.transactions.some(t=>months.some(m=>t.date&&t.date.startsWith(m.key)));
-  if(!hasTxns) return toast('⚠️ لا توجد بيانات كافية','error');
-
-  const stats=months.map(m=>({
-    label:m.label,
-    In:db.transactions.filter(t=>t.type==='donation'&&t.date&&t.date.startsWith(m.key)).reduce((s,t)=>s+t.amount,0),
-    Out:db.transactions.filter(t=>t.type==='expense'&&t.date&&t.date.startsWith(m.key)).reduce((s,t)=>s+t.amount,0),
-  })).map(s=>({...s,net:s.In-s.Out}));
-
-  const maxVal=Math.max(...stats.map(s=>Math.max(s.In,s.Out,Math.abs(s.net))),1);
-
-  const DPR=2, W=1400, HDR=180, CHART_H=500, FTR=120, LEG=80;
-  const H=HDR+CHART_H+LEG+FTR;
-  const cvs=document.getElementById('export-canvas');
-  cvs.width=W*DPR; cvs.height=H*DPR;
-  const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
-
-  // خلفية
-  ctx.fillStyle='#f8fbf8'; ctx.fillRect(0,0,W,H);
-
-  // هيدر
-  const gH=ctx.createLinearGradient(0,0,W,HDR);
-  gH.addColorStop(0,'#0a2e1a'); gH.addColorStop(1,'#2d8a56');
-  ctx.fillStyle=gH; ctx.fillRect(0,0,W,HDR);
-  ctx.font='40px Arial'; ctx.textAlign='center'; ctx.fillText('📈',80,HDR/2+14);
-  ctx.fillStyle='white'; ctx.font='bold 46px Cairo,Arial'; ctx.fillText('منحنى النمو الشهري',W/2,HDR/2-4);
-  ctx.fillStyle='#ffd166'; ctx.font='bold 22px Cairo,Arial';
-  ctx.fillText('الوارد والصادر والصافي — آخر 12 شهراً  |  '+new Date().toLocaleDateString('ar-EG'),W/2,HDR/2+38);
-
-  // منطقة الرسم البياني
-  const chartL=80,chartR=W-80,chartT=HDR+40,chartB=HDR+CHART_H-40;
-  const chartW=chartR-chartL, chartHH=chartB-chartT;
-  const barGroupW=chartW/months.length, barW=Math.min(barGroupW*0.28,36), barGap=4;
-
-  // خطوط شبكية
-  ctx.strokeStyle='#e0eee0'; ctx.lineWidth=1;
-  for(let i=0;i<=5;i++){
-    const y2=chartB-(i/5)*chartHH;
-    ctx.beginPath(); ctx.moveTo(chartL,y2); ctx.lineTo(chartR,y2); ctx.stroke();
-    const labelVal=Math.round(maxVal*i/5);
-    ctx.fillStyle='#8a9a8a'; ctx.font='16px Cairo,Arial'; ctx.textAlign='left';
-    ctx.fillText(labelVal.toLocaleString('ar-EG'),chartL+4,y2-4);
-  }
-
-  // محور X
-  ctx.strokeStyle='#c0d8c0'; ctx.lineWidth=1.5;
-  ctx.beginPath(); ctx.moveTo(chartL,chartB); ctx.lineTo(chartR,chartB); ctx.stroke();
-
-  // الأعمدة والنقاط
-  const netPoints=[];
-  stats.forEach((s,i)=>{
-    const cx=chartL+i*barGroupW+barGroupW/2;
-    const inH=maxVal>0?(s.In/maxVal)*chartHH:0;
-    const outH=maxVal>0?(s.Out/maxVal)*chartHH:0;
-
-    // عمود الوارد
-    const inY=chartB-inH;
-    ctx.fillStyle='rgba(39,174,96,0.85)';
-    roundRect(ctx,cx-barW-barGap,inY,barW,inH,{tl:6,tr:6,bl:0,br:0}); ctx.fill();
-    if(s.In>0){ctx.fillStyle='#1a5c38';ctx.font='bold 15px Cairo,Arial';ctx.textAlign='center';ctx.fillText(s.In.toLocaleString('ar-EG'),cx-barW/2-barGap,inY-6);}
-
-    // عمود الصادر
-    const outY=chartB-outH;
-    ctx.fillStyle='rgba(192,57,43,0.85)';
-    roundRect(ctx,cx+barGap,outY,barW,outH,{tl:6,tr:6,bl:0,br:0}); ctx.fill();
-    if(s.Out>0){ctx.fillStyle='#c0392b';ctx.font='bold 15px Cairo,Arial';ctx.textAlign='center';ctx.fillText(s.Out.toLocaleString('ar-EG'),cx+barW/2+barGap,outY-6);}
-
-    // نقطة الصافي
-    const netH=maxVal>0?(Math.abs(s.net)/maxVal)*chartHH*0.85:0;
-    const netY=s.net>=0?chartB-netH:chartB;
-    netPoints.push({x:cx,y:s.net>=0?chartB-netH:chartB+(Math.abs(s.net)/maxVal)*chartHH*0.4,net:s.net});
-
-    // label الشهر
-    ctx.fillStyle='#3a5a3a'; ctx.font='bold 17px Cairo,Arial'; ctx.textAlign='center';
-    ctx.fillText(s.label,cx,chartB+24);
-  });
-
-  // خط الصافي
-  ctx.strokeStyle='#f0a500'; ctx.lineWidth=3; ctx.setLineDash([8,4]);
-  ctx.beginPath();
-  netPoints.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
-  ctx.stroke(); ctx.setLineDash([]);
-
-  // نقاط الصافي
-  netPoints.forEach(p=>{
-    ctx.fillStyle=p.net>=0?'#f0a500':'#c0392b';
-    ctx.beginPath(); ctx.arc(p.x,p.y,7,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill();
-  });
-
-  // مفتاح الألوان
-  const legY=HDR+CHART_H+20;
-  const legendItems=[
-    {color:'rgba(39,174,96,0.85)',label:'الوارد الشهري'},
-    {color:'rgba(192,57,43,0.85)',label:'الصادر الشهري'},
-    {color:'#f0a500',label:'الصافي (منحنى)'},
-  ];
-  legendItems.forEach((item,i)=>{
-    const lx=W/2+(i-1)*280;
-    ctx.fillStyle=item.color; roundRect(ctx,lx-120,legY,28,28,6); ctx.fill();
-    ctx.fillStyle='#1a2e1a'; ctx.font='bold 20px Cairo,Arial'; ctx.textAlign='right';
-    ctx.fillText(item.label,lx-8,legY+22);
-  });
-
-  // فوتر
-  ctx.fillStyle='rgba(26,92,56,0.06)'; ctx.fillRect(0,H-FTR+10,W,FTR-10);
-  ctx.fillStyle='#5a7a5a'; ctx.font='bold 20px Cairo,Arial'; ctx.textAlign='center';
-  ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿',W/2,H-FTR+10+40);
-
-  const img=document.getElementById('img-preview');
-  img.src=cvs.toDataURL('image/png');
-  currentDownloadName='تقرير_منحنى_النمو.png';
-  document.getElementById('img-modal').classList.add('open');
-}
-
-// ============================================================
-// 💳 بطاقة مساهم — تقرير شخصي لكل متبرع
-// ============================================================
-function generateDonorCardReport() {
-  if(!db.donors.length) return toast('⚠️ لا يوجد مساهمون','error');
-  // اعرض قائمة لاختيار المساهم
-  const list=db.donors.map(d=>{
-    const total=db.transactions.filter(t=>t.type==='donation'&&t.donorId===d.id).reduce((s,t)=>s+t.amount,0);
-    return `<div onclick="drawDonorCard(${d.id})" style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background .15s;" onmouseover="this.style.background='#f0f7f0'" onmouseout="this.style.background=''">
-      <div><strong style="color:var(--primary);">${d.name}</strong> <span style="font-size:12px;color:#777;">(${d.code})</span></div>
-      <span style="color:var(--success);font-weight:700;">${total.toLocaleString('ar-EG')} ج</span>
-    </div>`;
-  }).join('');
-  const modal=document.createElement('div');
-  modal.className='modal-overlay open'; modal.id='donor-card-pick';
-  modal.innerHTML=`<div class="modal" style="max-width:500px;padding:0;overflow:hidden;"><div style="padding:20px;background:var(--primary);color:white;"><div class="modal-title" style="color:white;margin:0;">💳 اختر المساهم لإنشاء بطاقته</div></div><div style="max-height:400px;overflow-y:auto;">${list}</div><div class="modal-actions" style="padding:16px;border-top:1px solid var(--border);"><button class="btn btn-outline btn-sm" onclick="document.getElementById('donor-card-pick').remove()">إغلاق</button></div></div>`;
-  document.body.appendChild(modal);
-  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
-}
-
 function drawDonorCard(donorId) {
-  document.getElementById('donor-card-pick')?.remove();
-  const donor=db.donors.find(d=>d.id===donorId);
-  if(!donor) return;
-  const txns=db.transactions.filter(t=>t.type==='donation'&&t.donorId===donorId).sort((a,b)=>new Date(a.date)-new Date(b.date));
-  const total=txns.reduce((s,t)=>s+t.amount,0);
-  const count=txns.length;
-  const firstDate=txns.length?txns[0].date:'';
-  const lastDate=txns.length?txns[txns.length-1].date:'';
-  const overallTotal=db.transactions.filter(t=>t.type==='donation').reduce((s,t)=>s+t.amount,0);
-  const pct=overallTotal>0?Math.round(total/overallTotal*100):0;
+  document.getElementById('dcs-modal')?.remove();
+  const donor = db.donors.find(d => String(d.id) === String(donorId));
+  if(!donor) { toast('⚠️ لم يُعثر على المساهم','error'); return; }
 
-  // آخر 6 شهور لهذا المساهم
-  const now=new Date();
-  const last6=[];
-  for(let i=5;i>=0;i--){
-    let m=now.getMonth()+1-i,y=now.getFullYear();
-    if(m<=0){m+=12;y--;}
+  const _pvtCard = new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
+  const txns = db.transactions.filter(t => t.type==='donation' && String(t.donorId)===String(donorId) && !_pvtCard.has(t.projectId)).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const total = txns.reduce((s,t)=>s+t.amount,0);
+  const overallTotal = db.transactions.filter(t=>t.type==='donation'&&!_pvtCard.has(t.projectId)).reduce((s,t)=>s+t.amount,0);
+  const pct = overallTotal>0?Math.round(total/overallTotal*100):0;
+  const count = txns.length;
+  const firstDate = txns.length ? txns[0].date : '';
+  const lastDate  = txns.length ? txns[txns.length-1].date : '';
+
+  const now=new Date(); const last6=[];
+  for(let i=5;i>=0;i--){let m=now.getMonth()+1-i,y=now.getFullYear();if(m<=0){m+=12;y--;}
     const key=`${y}-${String(m).padStart(2,'0')}`;
-    const amt=txns.filter(t=>t.date.startsWith(key)).reduce((s,t)=>s+t.amount,0);
-    last6.push({label:`${m}/${y}`,key,amt});
-  }
+    last6.push({label:`${m}/${y}`,amt:txns.filter(t=>t.date&&t.date.startsWith(key)).reduce((s,t)=>s+t.amount,0)});}
   const maxMonth=Math.max(...last6.map(x=>x.amt),1);
 
-  const DPR=2,W=900,H=1100;
+  const totalsMap={};
+  db.transactions.filter(t=>t.type==='donation'&&t.donorId&&t.donorId!=='general').forEach(t=>{totalsMap[t.donorId]=(totalsMap[t.donorId]||0)+t.amount;});
+  const rank=Object.entries(totalsMap).sort((a,b)=>b[1]-a[1]).findIndex(([id])=>String(id)===String(donorId))+1;
+
+  const DPR=2,W=900,H=1000;
   const cvs=document.getElementById('export-canvas');
   cvs.width=W*DPR; cvs.height=H*DPR;
   const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
 
-  // خلفية
   ctx.fillStyle='#f0f5f1'; ctx.fillRect(0,0,W,H);
-
-  // بطاقة رئيسية
-  ctx.shadowColor='rgba(0,0,0,0.12)'; ctx.shadowBlur=30; ctx.shadowOffsetY=10;
-  ctx.fillStyle='white'; roundRect(ctx,30,30,W-60,H-60,24); ctx.fill();
+  ctx.shadowColor='rgba(0,0,0,0.1)'; ctx.shadowBlur=24; ctx.shadowOffsetY=8;
+  ctx.fillStyle='white'; roundRect(ctx,24,24,W-48,H-48,20); ctx.fill();
   ctx.shadowColor='transparent'; ctx.shadowBlur=0; ctx.shadowOffsetY=0;
 
-  // هيدر البطاقة
-  const gH=ctx.createLinearGradient(30,30,W-30,220);
+  const gH=ctx.createLinearGradient(24,24,W-24,200);
   gH.addColorStop(0,'#0a2e1a'); gH.addColorStop(1,'#2d8a56');
-  ctx.fillStyle=gH; roundRect(ctx,30,30,W-60,200,{tl:24,tr:24,bl:0,br:0}); ctx.fill();
+  ctx.fillStyle=gH; roundRect(ctx,24,24,W-48,180,{tl:20,tr:20,bl:0,br:0}); ctx.fill();
 
-  // دائرة الأفاتار
-  ctx.fillStyle='rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.arc(W/2,130,60,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.beginPath(); ctx.arc(W/2,130,50,0,Math.PI*2); ctx.fill();
-  ctx.font='52px Arial'; ctx.textAlign='center'; ctx.fillText('👤',W/2,150);
+  ctx.fillStyle='rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.arc(W/2,100,46,0,Math.PI*2); ctx.fill();
+  ctx.font='42px Arial'; ctx.textAlign='center'; ctx.fillText('👤',W/2,118);
+  ctx.fillStyle='white'; ctx.font='bold 32px Cairo,Arial'; ctx.fillText(donor.name,W/2,170);
+  ctx.fillStyle='#ffd166'; ctx.font='bold 17px Cairo,Arial'; ctx.fillText('🆔 الكود: '+donor.code,W/2,196);
 
-  // بطاقة شخصية: الاسم الكامل بشكل بارز
-  ctx.fillStyle='white'; ctx.font='bold 38px Cairo,Arial';
-  ctx.fillText(donor.name,W/2,200+24);
-  ctx.fillStyle='#ffd166'; ctx.font='bold 20px Cairo,Arial';
-  const genderLabel=getGenderLabel(donor.gender||'M');
-  ctx.fillText(genderLabel+'  |  كود المساهم: '+donor.code,W/2,232+22);
-  if(donor.phone){ ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='17px Cairo,Arial'; ctx.fillText('📞 '+donor.phone,W/2,258+10); }
-
-  // إحصائيات 3 بطاقات
-  const cards=[
-    {icon:'💰',label:'إجمالي المساهمات',val:total.toLocaleString('ar-EG')+' ج',color:'#1a5c38'},
-    {icon:'🗓️',label:'عدد المرات',val:count+' مرة',color:'#2980b9'},
-    {icon:'📊',label:'نسبة المساهمة',val:pct+'%',color:'#f0a500'},
-  ];
-  const cw=(W-80)/3, cy=300;
-  cards.forEach((c,i)=>{
-    const cx=40+i*cw;
-    ctx.fillStyle='#f0f5f1'; roundRect(ctx,cx+4,cy,cw-8,120,14); ctx.fill();
-    ctx.font='32px Arial'; ctx.textAlign='center'; ctx.fillText(c.icon,cx+cw/2,cy+44);
-    ctx.fillStyle=c.color; ctx.font='bold 28px Cairo,Arial'; ctx.fillText(c.val,cx+cw/2,cy+84);
-    ctx.fillStyle='#5a7a5a'; ctx.font='18px Cairo,Arial'; ctx.fillText(c.label,cx+cw/2,cy+110);
+  const cW=(W-80)/3;
+  [{icon:'💰',label:'إجمالي المساهمات',val:total.toLocaleString('ar-EG')+' ج',c:'#1a5c38'},
+   {icon:'🔢',label:'عدد المساهمات',val:count+' مرة',c:'#2980b9'},
+   {icon:'📊',label:'نسبته من الإجمالي',val:pct+'%',c:'#f0a500'}].forEach((c,i)=>{
+    const cx=40+i*(cW+10);
+    ctx.fillStyle='#f4faf5'; roundRect(ctx,cx,214,cW,94,12); ctx.fill();
+    ctx.font='26px Arial'; ctx.textAlign='center'; ctx.fillText(c.icon,cx+cW/2,248);
+    ctx.fillStyle=c.c; ctx.font='bold 22px Cairo,Arial'; ctx.fillText(c.val,cx+cW/2,280);
+    ctx.fillStyle='#5a7a5a'; ctx.font='13px Cairo,Arial'; ctx.fillText(c.label,cx+cW/2,300);
   });
 
-  // تواريخ
-  ctx.fillStyle='#e8f5e9'; roundRect(ctx,50,440,W-100,60,12); ctx.fill();
-  ctx.textAlign='right'; ctx.fillStyle='#0f3d25'; ctx.font='bold 22px Cairo,Arial';
-  ctx.fillText('أول مساهمة: '+formatDate(firstDate),W-70,478);
-  ctx.textAlign='left'; ctx.fillStyle='#0f3d25';
-  ctx.fillText('آخر مساهمة: '+formatDate(lastDate),70,478);
+  ctx.fillStyle='#e8f5e9'; roundRect(ctx,40,326,W-80,46,10); ctx.fill();
+  ctx.fillStyle='#0f3d25'; ctx.font='bold 15px Cairo,Arial';
+  ctx.textAlign='right'; ctx.fillText('أول مساهمة: '+formatDate(firstDate),W-55,352);
+  ctx.textAlign='left';  ctx.fillText('آخر مساهمة: '+formatDate(lastDate),55,352);
+  if(rank>0){ctx.fillStyle='#f0a500';ctx.textAlign='center';ctx.fillText('🏅 الترتيب: المركز '+rank,W/2,368);}
 
-  // رسم بياني آخر 6 شهور
-  ctx.textAlign='center'; ctx.fillStyle='#0f3d25'; ctx.font='bold 26px Cairo,Arial';
-  ctx.fillText('📅 سجل المساهمات — آخر 6 شهور',W/2,540);
-
-  const bL=60,bR=W-60,bT=560,bB=780;
-  const bW=(bR-bL)/6, bH=bB-bT;
+  ctx.fillStyle='#0f3d25'; ctx.font='bold 20px Cairo,Arial'; ctx.textAlign='center'; ctx.fillText('📅 مساهمات آخر 6 شهور',W/2,404);
+  const bL=50,bR=W-50,bT=420,bB=610,bW2=(bR-bL)/6,bHH=bB-bT;
   last6.forEach((m,i)=>{
-    const cx=bL+i*bW+bW/2;
-    const barH=maxMonth>0?(m.amt/maxMonth)*bH*0.9:0;
-    // خلفية العمود
-    ctx.fillStyle='#e8f0e8'; roundRect(ctx,cx-28,bT,56,bH,{tl:8,tr:8,bl:0,br:0}); ctx.fill();
-    // العمود الفعلي
+    const cx=bL+i*bW2+bW2/2;
+    const bh=m.amt>0?Math.max((m.amt/maxMonth)*bHH*0.88,8):0;
+    const isMax=(m.amt===Math.max(...last6.map(x=>x.amt))&&m.amt>0);
+    ctx.fillStyle='#e0ece0'; roundRect(ctx,cx-24,bT,48,bHH,{tl:6,tr:6,bl:0,br:0}); ctx.fill();
     if(m.amt>0){
-      const bColor=m.amt===Math.max(...last6.map(x=>x.amt))?'#f0a500':'#1a5c38';
-      ctx.fillStyle=bColor; roundRect(ctx,cx-28,bT+bH-barH,56,barH,{tl:8,tr:8,bl:0,br:0}); ctx.fill();
-      ctx.fillStyle=bColor; ctx.font='bold 20px Cairo,Arial'; ctx.textAlign='center';
-      ctx.fillText(m.amt.toLocaleString('ar-EG'),cx,bT+bH-barH-8);
-    } else {
-      ctx.fillStyle='#bbb'; ctx.font='28px Arial'; ctx.textAlign='center';
-      ctx.fillText('—',cx,bT+bH/2+10);
+      ctx.fillStyle=isMax?'#f0a500':'#1a5c38';
+      roundRect(ctx,cx-24,bT+bHH-bh,48,bh,{tl:6,tr:6,bl:0,br:0}); ctx.fill();
+      ctx.fillStyle=isMax?'#8a5a00':'#0f3d25'; ctx.font='bold 14px Cairo,Arial'; ctx.textAlign='center';
+      ctx.fillText(m.amt.toLocaleString('ar-EG'),cx,bT+bHH-bh-6);
     }
-    ctx.fillStyle='#3a5a3a'; ctx.font='bold 18px Cairo,Arial'; ctx.textAlign='center';
-    ctx.fillText(m.label,cx,bB+26);
+    ctx.fillStyle='#3a5a3a'; ctx.font='bold 14px Cairo,Arial'; ctx.textAlign='center';
+    ctx.fillText(m.label,cx,bB+20);
   });
 
-  // آخر المشاريع
-  const projTotals={};
-  txns.forEach(t=>{projTotals[t.projectId]=(projTotals[t.projectId]||0)+t.amount;});
-  const sortedProj=Object.entries(projTotals).map(([id,amt])=>({name:db.projects.find(p=>p.id==id)?.name||'?',amt})).sort((a,b)=>b.amt-a.amt).slice(0,4);
+  const projMap={};
+  txns.forEach(t=>{projMap[t.projectId]=(projMap[t.projectId]||0)+t.amount;});
+  const topP=Object.entries(projMap).map(([id,amt])=>({name:db.projects.find(p=>String(p.id)===String(id))?.name||'?',amt})).sort((a,b)=>b.amt-a.amt).slice(0,4);
+  if(topP.length){
+    ctx.fillStyle='#0f3d25'; ctx.font='bold 18px Cairo,Arial'; ctx.textAlign='center'; ctx.fillText('🎯 توزيع الصناديق',W/2,652);
+    const maxP=topP[0].amt;
+    topP.forEach((p,i)=>{
+      const py=668+i*48;
+      ctx.fillStyle='#f0f5f1'; roundRect(ctx,40,py,W-80,38,8); ctx.fill();
+      const bw=Math.round((W-140)*(p.amt/maxP)*0.72);
+      ctx.fillStyle='rgba(26,92,56,0.65)'; roundRect(ctx,40,py,bw+50,38,8); ctx.fill();
+      ctx.textAlign='right'; ctx.fillStyle='white'; ctx.font='bold 17px Cairo,Arial'; ctx.fillText(p.name,W-55,py+25);
+      ctx.textAlign='left'; ctx.fillStyle='white'; ctx.fillText(p.amt.toLocaleString('ar-EG')+' ج',55,py+25);
+    });
+  }
 
-  ctx.textAlign='center'; ctx.fillStyle='#0f3d25'; ctx.font='bold 26px Cairo,Arial';
-  ctx.fillText('🎯 توزيع المساهمات على المشاريع',W/2,830);
-  const maxProj=sortedProj.length?sortedProj[0].amt:1;
-  sortedProj.forEach((p,i)=>{
-    const py=860+i*52;
-    ctx.fillStyle='#f0f5f1'; roundRect(ctx,50,py,W-100,42,10); ctx.fill();
-    const barWp=Math.round((W-160)*(p.amt/maxProj)*0.8);
-    ctx.fillStyle='rgba(26,92,56,0.7)'; roundRect(ctx,50,py,barWp+50,42,10); ctx.fill();
-    ctx.textAlign='right'; ctx.fillStyle='white'; ctx.font='bold 20px Cairo,Arial';
-    ctx.fillText(p.name,W-70,py+28);
-    ctx.textAlign='left'; ctx.fillStyle='white'; ctx.font='bold 20px Cairo,Arial';
-    ctx.fillText(p.amt.toLocaleString('ar-EG')+' ج',70,py+28);
-  });
-
-  // فوتر
-  ctx.fillStyle='rgba(26,92,56,0.06)'; ctx.fillRect(30,H-90,W-60,60);
-  ctx.textAlign='center'; ctx.fillStyle='#5a7a5a'; ctx.font='bold 20px Cairo,Arial';
-  ctx.fillText('جزاكم الله خيراً  🌿  نظام إدارة التبرعات السحابي برو',W/2,H-55);
+  ctx.fillStyle='rgba(26,92,56,0.07)'; roundRect(ctx,24,H-60,W-48,36,{tl:0,tr:0,bl:20,br:20}); ctx.fill();
+  ctx.fillStyle='#5a7a5a'; ctx.font='bold 15px Cairo,Arial'; ctx.textAlign='center';
+  ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿  —  جزاكم الله خيراً',W/2,H-36);
 
   const img=document.getElementById('img-preview');
   img.src=cvs.toDataURL('image/png');
@@ -1993,324 +1337,101 @@ function drawDonorCard(donorId) {
   document.getElementById('img-modal').classList.add('open');
 }
 
-
-// ============================================================
-// 📢 رسالة الجروب الشهرية — أكواد فقط بدون أسماء
-// ============================================================
-function generateGroupMessage() {
-  // رسالة الجروب الآن صورة كانفاس احترافية — بدون رابط جروب
-  const now = new Date();
-  const thisM = now.getMonth()+1, thisY = now.getFullYear();
-  const monthKey = `${thisY}-${String(thisM).padStart(2,'0')}`;
-
-  const last6Keys=[];
-  for(let i=5;i>=0;i--){let m=thisM-i,y=thisY;if(m<=0){m+=12;y--;}last6Keys.push(`${y}-${String(m).padStart(2,'0')}`);}
-  const prev5Keys=last6Keys.slice(0,5);
-  const prev5Total=db.transactions.filter(t=>t.type==='donation'&&t.date&&prev5Keys.some(k=>t.date.startsWith(k))).reduce((s,t)=>s+t.amount,0);
-  const avg5=prev5Total/5;
-  const thisTxns=db.transactions.filter(t=>t.type==='donation'&&t.date&&t.date.startsWith(monthKey));
+function generateGroupMessage(monthOffset) {
+  monthOffset=monthOffset||0;
+  const now=new Date(), target=new Date(now.getFullYear(),now.getMonth()-monthOffset,1);
+  const thisM=target.getMonth()+1, thisY=target.getFullYear();
+  const monthKey=`${thisY}-${String(thisM).padStart(2,'0')}`;
+  const last6Keys=[]; for(let i=5;i>=0;i--){let m=thisM-i,y=thisY;if(m<=0){m+=12;y--;}last6Keys.push(`${y}-${String(m).padStart(2,'0')}`);}
+  const prev5T=db.transactions.filter(t=>t.type==='donation'&&t.date&&last6Keys.slice(0,5).some(k=>t.date.startsWith(k))).reduce((s,t)=>s+t.amount,0);
+  const avg5=prev5T/5;
+  const _pvt=new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
+  const thisTxns=db.transactions.filter(t=>t.type==='donation'&&t.date&&t.date.startsWith(monthKey)&&!_pvt.has(t.projectId));
   const thisTotal=thisTxns.reduce((s,t)=>s+t.amount,0);
-  const paidIds=new Set(thisTxns.filter(t=>t.donorId&&t.donorId!=='general').map(t=>t.donorId));
-  const paidCodes=[...paidIds].map(id=>db.donors.find(d=>d.id==id)?.code||'?').sort();
-  const unpaidCodes=db.donors.filter(d=>!d.isArchived&&!paidIds.has(d.id)).map(d=>d.code).sort();
+  const paidIds=new Set(thisTxns.filter(t=>t.donorId&&t.donorId!=='general').map(t=>String(t.donorId)));
+  const paidCodes=[...paidIds].map(id=>db.donors.find(d=>String(d.id)===id)?.code||'?').sort();
+  const unpaidCodes=db.donors.filter(d=>!d.isArchived&&!paidIds.has(String(d.id))).map(d=>d.code).sort();
   const thisCount=paidIds.size;
   const vsAvg=avg5>0?Math.round((thisTotal-avg5)/avg5*100):0;
-  const activeP=db.projects.filter(p=>!p.isArchived&&!p.isPrivate);
-  const total6=db.transactions.filter(t=>t.type==='donation'&&t.date&&last6Keys.some(k=>t.date.startsWith(k))).reduce((s,t)=>s+t.amount,0);
+  const total6=db.transactions.filter(t=>t.type==='donation'&&t.date&&last6Keys.some(k=>t.date.startsWith(k))&&!_pvt.has(t.projectId)).reduce((s,t)=>s+t.amount,0);
 
-  // ── رسم الصورة ──
-  const DPR=2, W=1000;
-  // حساب الارتفاع بناءً على المحتوى
-  const rowsP = Math.ceil(paidCodes.length/5);
-  const rowsU = Math.ceil(unpaidCodes.length/5);
-  const projRows = activeP.length;
-  const H = 180 + 120 + 40 + (rowsP*38+60) + (rowsU*38+60) + (projRows*44+60) + 120 + 60;
-
-  const cvs=document.getElementById('export-canvas');
-  cvs.width=W*DPR; cvs.height=H*DPR;
+  const DPR=2,W=1000; const rowsP=Math.ceil(paidCodes.length/5)||1; const rowsU=unpaidCodes.length?Math.ceil(unpaidCodes.length/5):0;
+  const H=168+128+(rowsP*38+62)+(rowsU?rowsU*38+62:0)+66;
+  const cvs=document.getElementById('export-canvas'); cvs.width=W*DPR; cvs.height=H*DPR;
   const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
-
-  // خلفية
   ctx.fillStyle='#f0f5f1'; ctx.fillRect(0,0,W,H);
-
-  // هيدر
-  const gH=ctx.createLinearGradient(0,0,W,160);
-  gH.addColorStop(0,'#0a2e1a'); gH.addColorStop(1,'#2d8a56');
-  ctx.fillStyle=gH; roundRect(ctx,0,0,W,160,0); ctx.fill();
-
-  ctx.font='36px Arial'; ctx.textAlign='center'; ctx.fillText('📊',60,95);
-  ctx.fillStyle='white'; ctx.font='bold 42px Cairo,Arial';
-  ctx.fillText('تقرير مساهمات شهر '+thisM+'/'+thisY, W/2, 75);
-  ctx.fillStyle='#ffd166'; ctx.font='bold 22px Cairo,Arial';
-  ctx.fillText('نظام إدارة التبرعات السحابي 🌿', W/2, 120);
-
-  // بطاقات الملخص
-  const cardY=175, cW=220, cGap=20, cH=90;
-  const cStart=(W-(cW*4+cGap*3))/2;
-  const summCards=[
-    {label:'إجمالي الوارد',val:thisTotal.toLocaleString('ar-EG')+' ج',color:'#1a5c38'},
-    {label:'عدد المساهمين',val:thisCount+' مساهم',color:'#2980b9'},
-    {label:'إجمالي 6 شهور',val:total6.toLocaleString('ar-EG')+' ج',color:'#8e44ad'},
-    {label:'مقارنة بالمتوسط',val:(vsAvg>=0?'↑':'↓')+Math.abs(vsAvg)+'%',color:vsAvg>=0?'#1a7a40':'#c0392b'},
-  ];
-  ctx.shadowColor='rgba(0,0,0,0.1)'; ctx.shadowBlur=12; ctx.shadowOffsetY=4;
-  summCards.forEach((c,i)=>{
-    const cx=cStart+i*(cW+cGap);
-    ctx.fillStyle='white'; roundRect(ctx,cx,cardY,cW,cH,12); ctx.fill();
-    ctx.shadowColor='transparent'; ctx.shadowBlur=0;
-    ctx.fillStyle=c.color; ctx.font='bold 26px Cairo,Arial'; ctx.textAlign='center';
-    ctx.fillText(c.val,cx+cW/2,cardY+46);
-    ctx.fillStyle='#5a7a5a'; ctx.font='15px Cairo,Arial';
-    ctx.fillText(c.label,cx+cW/2,cardY+72);
-    ctx.shadowColor='rgba(0,0,0,0.1)'; ctx.shadowBlur=12; ctx.shadowOffsetY=4;
-  });
+  const gH=ctx.createLinearGradient(0,0,W,155); gH.addColorStop(0,'#0a2e1a'); gH.addColorStop(1,'#2d8a56');
+  ctx.fillStyle=gH; ctx.fillRect(0,0,W,155);
+  ctx.font='34px Arial'; ctx.textAlign='center'; ctx.fillText('📊',68,88);
+  ctx.fillStyle='white'; ctx.font='bold 38px Cairo,Arial'; ctx.fillText('تقرير شهر '+thisM+'/'+thisY,W/2,72);
+  ctx.fillStyle='#ffd166'; ctx.font='bold 18px Cairo,Arial'; ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿',W/2,112);
+  const cW2=215,cGap=16,cSt=(W-(cW2*4+cGap*3))/2,cY=162,cH=102;
+  const sCards=[{label:'إجمالي الوارد',val:thisTotal.toLocaleString('ar-EG')+' ج',color:'#1a5c38'},{label:'عدد المساهمين',val:thisCount+' مساهم',color:'#2980b9'},{label:'إجمالي 6 شهور',val:total6.toLocaleString('ar-EG')+' ج',color:'#8e44ad'},{label:'مقارنة المتوسط',val:(vsAvg>=0?'↑':'↓')+Math.abs(vsAvg)+'%',color:vsAvg>=0?'#1a7a40':'#c0392b'}];
+  ctx.shadowColor='rgba(0,0,0,0.08)'; ctx.shadowBlur=10; ctx.shadowOffsetY=4;
+  sCards.forEach((c,i)=>{const cx=cSt+i*(cW2+cGap); ctx.fillStyle='white'; roundRect(ctx,cx,cY,cW2,cH,12); ctx.fill(); ctx.shadowColor='transparent'; ctx.shadowBlur=0; ctx.fillStyle=c.color; ctx.font='bold 22px Cairo,Arial'; ctx.textAlign='center'; ctx.fillText(c.val,cx+cW2/2,cY+44); ctx.fillStyle='#5a7a5a'; ctx.font='13px Cairo,Arial'; ctx.fillText(c.label,cx+cW2/2,cY+68); ctx.shadowColor='rgba(0,0,0,0.08)'; ctx.shadowBlur=10; ctx.shadowOffsetY=4;});
   ctx.shadowColor='transparent'; ctx.shadowBlur=0; ctx.shadowOffsetY=0;
-
-  let curY=cardY+cH+30;
-
-  function drawSection(title,codes,bg,textColor){
-    if(!codes.length) return;
-    // عنوان القسم
-    ctx.fillStyle=bg; roundRect(ctx,20,curY,W-40,44,{tl:10,tr:10,bl:0,br:0}); ctx.fill();
-    ctx.fillStyle='white'; ctx.font='bold 22px Cairo,Arial'; ctx.textAlign='right';
-    ctx.fillText(title+' ('+codes.length+')',W-36,curY+30);
-
-    // خلفية القسم
-    const rowCount=Math.ceil(codes.length/5);
-    const secH=rowCount*38+14;
-    ctx.fillStyle='white'; roundRect(ctx,20,curY+44,W-40,secH,{tl:0,tr:0,bl:10,br:10}); ctx.fill();
-
-    // الأكواد
-    ctx.fillStyle=textColor; ctx.font='bold 19px Cairo,Arial';
-    for(let i=0;i<codes.length;i++){
-      const col=i%5, row=Math.floor(i/5);
-      const colW=(W-80)/5;
-      const cx=W-40-col*colW-colW/2;
-      const cy=curY+44+14+row*38;
-      ctx.textAlign='center'; ctx.fillText(codes[i],cx,cy+18);
-    }
-    curY+=44+secH+16;
-  }
-
-  drawSection('✅ المساهمون هذا الشهر', paidCodes, '#1a5c38', '#0f3d25');
-  drawSection('⏳ لم تُسجَّل مساهمتهم بعد', unpaidCodes, '#c0392b', '#7b241c');
-
-  // أرصدة المشاريع
-  if(activeP.length){
-    ctx.fillStyle='#1a3a5c'; roundRect(ctx,20,curY,W-40,44,{tl:10,tr:10,bl:0,br:0}); ctx.fill();
-    ctx.fillStyle='white'; ctx.font='bold 22px Cairo,Arial'; ctx.textAlign='right';
-    ctx.fillText('🎯 أرصدة المشاريع الفعالة',W-36,curY+30);
-    const projSecH=activeP.length*44+10;
-    ctx.fillStyle='white'; roundRect(ctx,20,curY+44,W-40,projSecH,{tl:0,tr:0,bl:10,br:10}); ctx.fill();
-    activeP.forEach((p,i)=>{
-      const py=curY+44+8+i*44;
-      const bal=getProjectBalance(p.id);
-      const barColor=bal>=0?'#1a5c38':'#c0392b';
-      ctx.fillStyle='#f0f5f1'; roundRect(ctx,32,py,W-64,36,8); ctx.fill();
-      ctx.textAlign='right'; ctx.fillStyle='#0f3d25'; ctx.font='bold 19px Cairo,Arial';
-      ctx.fillText(p.name,W-44,py+24);
-      ctx.textAlign='left'; ctx.fillStyle=barColor; ctx.font='bold 21px Cairo,Arial';
-      ctx.fillText(bal.toLocaleString('ar-EG')+' ج',44,py+24);
-    });
-    curY+=44+projSecH+16;
-  }
-
-  // فوتر
-  ctx.fillStyle='#1a5c38'; roundRect(ctx,20,curY,W-40,56,12); ctx.fill();
-  ctx.fillStyle='white'; ctx.font='bold 20px Cairo,Arial'; ctx.textAlign='center';
-  ctx.fillText('جزاكم الله خيراً وبارك في أموالكم 🤲',W/2,curY+36);
-  // بدون رابط الجروب — تُنشر داخل الجروب مباشرة
-
-  const img=document.getElementById('img-preview');
-  img.src=cvs.toDataURL('image/png');
+  let curY=cY+cH+14;
+  function drawSec(title,codes,bg){if(!codes.length)return; ctx.fillStyle=bg; roundRect(ctx,18,curY,W-36,40,{tl:10,tr:10,bl:0,br:0}); ctx.fill(); ctx.fillStyle='white'; ctx.font='bold 18px Cairo,Arial'; ctx.textAlign='right'; ctx.fillText(title+' ('+codes.length+')',W-32,curY+26); const rC=Math.ceil(codes.length/5); const sH=rC*36+10; ctx.fillStyle='white'; roundRect(ctx,18,curY+40,W-36,sH,{tl:0,tr:0,bl:10,br:10}); ctx.fill(); for(let i=0;i<codes.length;i++){const col=i%5,row=Math.floor(i/5),colW2=(W-72)/5,cx=W-36-col*colW2-colW2/2,cy=curY+40+8+row*36; ctx.fillStyle='#0f3d25'; ctx.font='bold 17px Cairo,Arial'; ctx.textAlign='center'; ctx.fillText(codes[i],cx,cy+18);} curY+=40+sH+12;}
+  drawSec('✅ المساهمون هذا الشهر',paidCodes,'#1a5c38');
+  drawSec('⏳ لم تُسجَّل مساهمتهم بعد',unpaidCodes,'#c0392b');
+  ctx.fillStyle='#1a5c38'; roundRect(ctx,18,curY,W-36,50,10); ctx.fill();
+  ctx.fillStyle='white'; ctx.font='bold 18px Cairo,Arial'; ctx.textAlign='center'; ctx.fillText('جزاكم الله خيراً وبارك في أموالكم 🤲',W/2,curY+32);
+  const img=document.getElementById('img-preview'); img.src=cvs.toDataURL('image/png');
   currentDownloadName='رسالة_الجروب_'+thisM+'_'+thisY+'.png';
   document.getElementById('img-modal').classList.add('open');
 }
 
-function copyGroupMsg(){
-  const txt=document.getElementById('group-msg-text').value;
-  navigator.clipboard.writeText(txt).then(()=>toast('✅ تم نسخ الرسالة','success'));
-}
-
-function shareGroupMsg(){
-  const txt=document.getElementById('group-msg-text').value;
-  const url='https://wa.me/?text='+encodeURIComponent(txt);
-  window.open(url,'_blank');
-  closeModal('group-msg-modal');
-}
-
 
 // ============================================================
-// 🤝 صندوق القرض الحسن
+// 🤝 صندوق القرض الحسن — الدوال الناقصة
 // ============================================================
-function initQardData() {
-  if (!db.qard) db.qard = { deposits:[], loans:[] };
-  if (!db.qard.deposits) db.qard.deposits = [];
-  if (!db.qard.loans) db.qard.loans = [];
+function initQard() {
+  if(!db.qard) db.qard={deposits:[],loans:[]};
+  if(!db.qard.deposits) db.qard.deposits=[];
+  if(!db.qard.loans) db.qard.loans=[];
 }
 
 function getQardBalance() {
-  initQardData();
-  const totalDeposits = db.qard.deposits.reduce((s,d)=>s+d.amount,0);
-  const totalLent = db.qard.loans.reduce((s,l)=>s+l.amount,0);
-  const totalRepaid = db.qard.loans.reduce((s,l)=>s+(l.repayments||[]).reduce((r,p)=>r+p.amount,0),0);
-  return { balance: totalDeposits - totalLent + totalRepaid, totalLent, totalRepaid, totalDeposits };
-}
-
-function getQardLoanStatus(loan) {
-  const repaid = (loan.repayments||[]).reduce((s,p)=>s+p.amount,0);
-  const remaining = loan.amount - repaid;
-  return { repaid, remaining, done: remaining <= 0 };
-}
-
-async function saveQardDeposit() {
-  initQardData();
-  const amount = parseFloat(document.getElementById('qard-deposit-amount').value);
-  const date = document.getElementById('qard-deposit-date').value;
-  const notes = document.getElementById('qard-deposit-notes').value.trim();
-  if(!amount || amount<=0) return toast('⚠️ أدخل مبلغاً صحيحاً','error');
-  if(!date) return toast('⚠️ أدخل التاريخ','error');
-  db.qard.deposits.push({ id:Date.now(), amount, date, notes });
-  await saveDB();
-  document.getElementById('qard-deposit-amount').value='';
-  document.getElementById('qard-deposit-notes').value='';
-  toast('✅ تم الإيداع بنجاح','success');
-  renderQardPage();
-}
-
-async function saveQardLoan() {
-  initQardData();
-  const name = document.getElementById('qard-borrower-name').value.trim();
-  const amount = parseFloat(document.getElementById('qard-loan-amount').value);
-  const date = document.getElementById('qard-loan-date').value;
-  const notes = document.getElementById('qard-loan-notes').value.trim();
-  if(!name) return toast('⚠️ أدخل اسم المقترض','error');
-  if(!amount || amount<=0) return toast('⚠️ أدخل مبلغاً صحيحاً','error');
-  if(!date) return toast('⚠️ أدخل التاريخ','error');
-  db.qard.loans.push({ id:Date.now(), name, amount, date, notes, repayments:[] });
-  await saveDB();
-  document.getElementById('qard-borrower-name').value='';
-  document.getElementById('qard-loan-amount').value='';
-  document.getElementById('qard-loan-notes').value='';
-  toast('✅ تم تسجيل القرض','success');
-  renderQardPage();
+  initQard();
+  const dep  = db.qard.deposits.reduce((s,d)=>s+d.amount,0);
+  const lent = db.qard.loans.reduce((s,l)=>s+l.amount,0);
+  const rep  = db.qard.loans.reduce((s,l)=>s+(l.repayments||[]).reduce((r,p)=>r+p.amount,0),0);
+  return {balance:dep-lent+rep, totalLent:lent, totalRep:rep};
 }
 
 function openQardRepay(loanId) {
-  initQardData();
-  const loan = db.qard.loans.find(l=>l.id===loanId);
-  if(!loan) return;
-  const { repaid, remaining } = getQardLoanStatus(loan);
-  document.getElementById('qard-repay-loan-id').value = loanId;
-  document.getElementById('qard-repay-amount').value = '';
-  document.getElementById('qard-repay-date').value = new Date().toISOString().split('T')[0];
-  document.getElementById('qard-repay-notes').value = '';
-  document.getElementById('qard-repay-info').innerHTML = `
-    <strong>${loan.name}</strong><br>
-    القرض: ${loan.amount.toLocaleString('ar-EG')} ج &nbsp;|&nbsp;
-    المسدَّد: <span style="color:var(--success)">${repaid.toLocaleString('ar-EG')} ج</span> &nbsp;|&nbsp;
-    المتبقي: <span style="color:var(--danger);font-weight:700;">${remaining.toLocaleString('ar-EG')} ج</span>
-  `;
+  initQard();
+  const loan=db.qard.loans.find(l=>l.id===loanId); if(!loan) return;
+  const repaid=(loan.repayments||[]).reduce((s,p)=>s+p.amount,0);
+  const remaining=loan.amount-repaid;
+  document.getElementById('qard-repay-loan-id').value=loanId;
+  document.getElementById('qard-repay-amount').value='';
+  document.getElementById('qard-repay-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('qard-repay-notes').value='';
+  document.getElementById('qard-repay-info').innerHTML=
+    `<strong>${loan.name}</strong><br>القرض: ${loan.amount.toLocaleString('ar-EG')} ج &nbsp;|&nbsp;
+     المسدَّد: <span style="color:var(--success)">${repaid.toLocaleString('ar-EG')} ج</span> &nbsp;|&nbsp;
+     المتبقي: <span style="color:var(--danger);font-weight:700;">${remaining.toLocaleString('ar-EG')} ج</span>`;
   document.getElementById('qard-repay-modal').classList.add('open');
-}
-
-async function saveQardRepay() {
-  initQardData();
-  const loanId = parseInt(document.getElementById('qard-repay-loan-id').value);
-  const amount = parseFloat(document.getElementById('qard-repay-amount').value);
-  const date = document.getElementById('qard-repay-date').value;
-  const notes = document.getElementById('qard-repay-notes').value.trim();
-  if(!amount || amount<=0) return toast('⚠️ أدخل مبلغاً صحيحاً','error');
-  if(!date) return toast('⚠️ أدخل التاريخ','error');
-  const loan = db.qard.loans.find(l=>l.id===loanId);
-  if(!loan) return;
-  if(!loan.repayments) loan.repayments = [];
-  loan.repayments.push({ id:Date.now(), amount, date, notes });
-  await saveDB();
-  closeModal('qard-repay-modal');
-  toast('✅ تم تسجيل الدفعة','success');
-  renderQardPage();
 }
 
 async function deleteQardDeposit(id) {
   if(!confirm('حذف هذا الإيداع؟')) return;
-  initQardData();
-  db.qard.deposits = db.qard.deposits.filter(d=>d.id!==id);
-  await saveDB();
-  toast('تم الحذف','success');
-  renderQardPage();
+  initQard(); db.qard.deposits=db.qard.deposits.filter(d=>d.id!==id);
+  await saveDB(); toast('تم الحذف','success'); renderQardPage();
 }
 
 async function deleteQardLoan(id) {
   if(!confirm('حذف هذا القرض وجميع دفعاته؟')) return;
-  initQardData();
-  db.qard.loans = db.qard.loans.filter(l=>l.id!==id);
-  await saveDB();
-  toast('تم الحذف','success');
-  renderQardPage();
+  initQard(); db.qard.loans=db.qard.loans.filter(l=>l.id!==id);
+  await saveDB(); toast('تم الحذف','success'); renderQardPage();
 }
 
-function renderQardPage() {
-  initQardData();
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('qard-deposit-date').value = today;
-  document.getElementById('qard-loan-date').value = today;
-
-  const { balance, totalLent, totalRepaid } = getQardBalance();
-
-  // الملخص
-  const balEl = document.getElementById('qard-balance');
-  const lentEl = document.getElementById('qard-lent');
-  const retEl  = document.getElementById('qard-returned');
-  if(balEl)  { balEl.textContent = balance.toLocaleString('ar-EG'); balEl.style.color = balance>=0 ? 'var(--success)' : 'var(--danger)'; }
-  if(lentEl)  lentEl.textContent = totalLent.toLocaleString('ar-EG');
-  if(retEl)   retEl.textContent  = totalRepaid.toLocaleString('ar-EG');
-
-  // جدول القروض
-  const loansBody = document.getElementById('qard-loans-body');
-  if(loansBody) {
-    if(!db.qard.loans.length) {
-      loansBody.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="empty-icon">🤝</div><div class="empty-text">لا توجد قروض بعد</div></div></td></tr>';
-    } else {
-      loansBody.innerHTML = db.qard.loans.map(loan=>{
-        const { repaid, remaining, done } = getQardLoanStatus(loan);
-        const pct = loan.amount > 0 ? Math.round(repaid/loan.amount*100) : 0;
-        const statusBadge = done
-          ? '<span class="badge badge-active">✅ مكتمل</span>'
-          : `<span class="badge" style="background:#fff3cd;color:#856404;">⏳ ${pct}%</span>`;
-        const repayList = (loan.repayments||[]).length > 0
-          ? (loan.repayments||[]).map(p=>`<small style="display:block;color:#5a7a5a;">↩ ${p.amount.toLocaleString('ar-EG')} ج (${formatDate(p.date)})${p.notes?' — '+p.notes:''}</small>`).join('')
-          : '';
-        return `<tr style="${done?'opacity:0.65':''}">
-          <td><strong>${loan.name}</strong><br><small style="color:#777;">${formatDate(loan.date)}</small></td>
-          <td class="balance-neg">${loan.amount.toLocaleString('ar-EG')} ج</td>
-          <td class="balance-pos">${repaid.toLocaleString('ar-EG')} ج${repayList}</td>
-          <td class="${remaining>0?'balance-neg':'balance-pos'}">${remaining.toLocaleString('ar-EG')} ج</td>
-          <td>${statusBadge}</td>
-          <td style="font-size:12px;color:#777;">${loan.notes||'-'}</td>
-          <td style="display:flex;gap:4px;flex-wrap:wrap;">
-            ${!done?`<button class="btn btn-success btn-sm" onclick="openQardRepay(${loan.id})">💚 سداد</button>`:''}
-            <button class="btn btn-outline btn-sm" style="padding:4px 8px;" onclick="deleteQardLoan(${loan.id})">🗑️</button>
-          </td>
-        </tr>`;
-      }).join('');
-    }
-  }
-
-  // جدول الإيداعات
-  const depoBody = document.getElementById('qard-deposits-body');
-  if(depoBody) {
-    if(!db.qard.deposits.length) {
-      depoBody.innerHTML = '<tr><td colspan="4"><div class="empty"><div class="empty-icon">💵</div><div class="empty-text">لا توجد إيداعات بعد</div></div></td></tr>';
-    } else {
-      depoBody.innerHTML = [...db.qard.deposits].reverse().map(d=>`<tr>
-        <td>${formatDate(d.date)}</td>
-        <td class="balance-pos">${d.amount.toLocaleString('ar-EG')} ج</td>
-        <td style="color:#5a7a5a;">${d.notes||'-'}</td>
-        <td><button class="btn btn-outline btn-sm" style="padding:4px 8px;" onclick="deleteQardDeposit(${d.id})">🗑️</button></td>
-      </tr>`).join('');
-    }
-  }
+function resendWaFromStmt(txId) {
+  const tx=db.transactions.find(t=>t.id===txId); if(!tx) return toast('⚠️ لم يُعثر على الحركة','error');
+  const donor=db.donors.find(d=>d.id===tx.donorId); if(!donor) return toast('⚠️ لم يُعثر على المتبرع','error');
+  const project=db.projects.find(p=>p.id===tx.projectId); if(!project) return toast('⚠️ لم يُعثر على المشروع','error');
+  showWhatsAppModal(donor, tx.amount, tx.date, project, tx.id);
 }
 
 window.onload = loadDB;
