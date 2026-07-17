@@ -538,7 +538,9 @@ function setStatus(t, off) {
 
 function loadDB() {
   const today = new Date().toISOString().split('T')[0];
-  ['don-date','exp-date'].forEach(id => { const el=document.getElementById(id); if(el&&!el.value) el.value=today; });
+  ['don-date','exp-date','qard-deposit-date','qard-loan-date','qard-repay-date'].forEach(id => {
+    const el=document.getElementById(id); if(el) el.value=today;
+  });
   renderAll();
   setStatus('محلي 🟡', true);
   setTimeout(_connectFirebase, 300);
@@ -571,6 +573,8 @@ function _initFB() {
       try { localStorage.setItem('charity_db_v5', JSON.stringify(db)); } catch(e){}
       renderAll();
       setStatus('متصل 🟢', false);
+      // تحديث صفحة القرض إن كانت مفتوحة
+      if(document.getElementById('page-qard')?.classList.contains('active')) renderQardPage();
     }, err => { console.warn('FB:', err.message); setStatus('محلي 🟡', true); });
   } catch(e) { console.warn('FB init:', e.message); setStatus('محلي 🟡', true); }
 }
@@ -641,7 +645,14 @@ function showPage(id) {
   if(id==='home')     renderHomePage();
   if(id==='projects') renderProjectsTable();
   if(id==='donors')   renderDonorsTable();
-  if(id==='qard')     renderQardPage();
+  if(id==='qard') {
+    // تأكد من التواريخ عند فتح الصفحة
+    const today2=new Date().toISOString().split('T')[0];
+    ['qard-deposit-date','qard-loan-date','qard-repay-date'].forEach(eid=>{
+      const el=document.getElementById(eid); if(el&&!el.value) el.value=today2;
+    });
+    renderQardPage();
+  }
   window.scrollTo(0,0);
 }
 function switchTab(tabId, el) {
@@ -946,7 +957,13 @@ function renderStatement(){
   document.getElementById('stmt-body').innerHTML=html;
 }
 
-function renderAll() { renderDonorsTable(); renderProjectsTable(); renderHomePage(); if(selectedProject && document.getElementById('tab-statement').classList.contains('active')) renderStatement(); }
+function renderAll() {
+  renderDonorsTable();
+  renderProjectsTable();
+  renderHomePage();
+  if(selectedProject && document.getElementById('tab-statement').classList.contains('active')) renderStatement();
+  if(document.getElementById('page-qard')?.classList.contains('active')) renderQardPage();
+}
 
 function showWhatsAppModal(donor, amount, date, project, currentTxId){
   const donorTxns = db.transactions.filter(t => t.type === 'donation' && t.donorId === donor.id);
@@ -959,7 +976,31 @@ function showWhatsAppModal(donor, amount, date, project, currentTxId){
   }
   
   let titlePrefix = getGenderLabel(donor.gender || 'M'); if(titlePrefix !== 'جهة/شركة') titlePrefix += '/'; else titlePrefix += ':';
-  const msg=`السلام عليكم ورحمة الله وبركاته 🌿\n\n${titlePrefix} ${donor.name}\n✅ تم استلام مساهمتكم بنجاح في برنامج:\n${project.name}\n\n💵 قيمة المساهمة: ${amount.toLocaleString('ar-EG')} جنيه\n📅 التاريخ: ${formatDate(date)}\n\n🆔 كود المساهم: ${donor.code}\n\n💰 إجمالي مساهماتك حتى الآن: ${totalContributions.toLocaleString('ar-EG')} جنيه\n${lastDonsText}\nنسأل الله أن يتقبل منكم ويجعلها في ميزان حسناتكم 🤲\n\n📈 لمتابعة التقارير الدورية وأثر مساهماتكم:\n${WA_GROUP_LINK}`;
+  // حساب الترتيب
+  const totalsMap = {};
+  db.transactions.filter(t=>t.type==='donation'&&t.donorId&&t.donorId!=='general')
+    .forEach(t=>{totalsMap[t.donorId]=(totalsMap[t.donorId]||0)+t.amount;});
+  const rank = Object.entries(totalsMap).sort((a,b)=>b[1]-a[1]).findIndex(([id])=>String(id)===String(donor.id))+1;
+  const rankText = rank>0 ? `\n🏅 ترتيبك بين المساهمين: المركز ${rank}` : '';
+  const countText = `\n🔢 عدد مساهماتكم: ${donorTxns.length} مرة`;
+  const msg=`السلام عليكم ورحمة الله وبركاته 🌿
+
+${titlePrefix} ${donor.name}
+🆔 كودك: ${donor.code}
+
+✅ تم استلام مساهمتكم الكريمة بنجاح
+━━━━━━━━━━━━━━━━━━━━
+📌 المشروع: ${project.name}
+💵 المبلغ: ${amount.toLocaleString('ar-EG')} جنيه
+📅 التاريخ: ${formatDate(date)}
+━━━━━━━━━━━━━━━━━━━━
+💰 إجمالي مساهماتكم: ${totalContributions.toLocaleString('ar-EG')} جنيه${countText}${rankText}
+${lastDonsText}
+نسأل الله أن يتقبل منكم ويبارك فيكم 🤲
+جزاكم الله خيراً على سخائكم المستمر 🌿
+
+📈 لمتابعة أثر مساهماتكم:
+${WA_GROUP_LINK}`;
   
   document.getElementById('wa-message-text').textContent=msg;
   currentWaPhone = donor.phone ? donor.phone.replace(/[^0-9]/g,'') : ''; if(currentWaPhone && currentWaPhone.startsWith('0')) currentWaPhone='2'+currentWaPhone;
