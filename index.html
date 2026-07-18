@@ -1487,6 +1487,107 @@ function resendWaFromStmt(txId) {
   showWhatsAppModal(donor, tx.amount, tx.date, project, tx.id);
 }
 
+async function saveQardDeposit() {
+  initQard();
+  const amount=parseFloat(document.getElementById('qard-deposit-amount').value);
+  const date=document.getElementById('qard-deposit-date').value;
+  const notes=document.getElementById('qard-deposit-notes').value.trim();
+  if(!amount||amount<=0) return toast('⚠️ أدخل مبلغاً صحيحاً','error');
+  if(!date) return toast('⚠️ أدخل التاريخ','error');
+  db.qard.deposits.push({id:Date.now(),amount,date,notes});
+  await saveDB();
+  document.getElementById('qard-deposit-amount').value='';
+  document.getElementById('qard-deposit-notes').value='';
+  toast('✅ تم الإيداع','success'); renderQardPage();
+}
+
+async function saveQardLoan() {
+  initQard();
+  const name=document.getElementById('qard-borrower-name').value.trim();
+  const amount=parseFloat(document.getElementById('qard-loan-amount').value);
+  const date=document.getElementById('qard-loan-date').value;
+  const notes=document.getElementById('qard-loan-notes').value.trim();
+  if(!name) return toast('⚠️ أدخل اسم المقترض','error');
+  if(!amount||amount<=0) return toast('⚠️ أدخل المبلغ','error');
+  if(!date) return toast('⚠️ أدخل التاريخ','error');
+  db.qard.loans.push({id:Date.now(),name,amount,date,notes,repayments:[]});
+  await saveDB();
+  document.getElementById('qard-borrower-name').value='';
+  document.getElementById('qard-loan-amount').value='';
+  document.getElementById('qard-loan-notes').value='';
+  toast('✅ تم تسجيل القرض','success'); renderQardPage();
+}
+
+async function saveQardRepay() {
+  initQard();
+  const loanId=parseInt(document.getElementById('qard-repay-loan-id').value);
+  const amount=parseFloat(document.getElementById('qard-repay-amount').value);
+  const date=document.getElementById('qard-repay-date').value;
+  const notes=document.getElementById('qard-repay-notes').value.trim();
+  if(!amount||amount<=0) return toast('⚠️ أدخل المبلغ','error');
+  if(!date) return toast('⚠️ أدخل التاريخ','error');
+  const loan=db.qard.loans.find(l=>l.id===loanId);
+  if(!loan) return toast('⚠️ لم يُعثر على القرض','error');
+  if(!loan.repayments) loan.repayments=[];
+  loan.repayments.push({id:Date.now(),amount,date,notes});
+  await saveDB(); closeModal('qard-repay-modal');
+  toast('✅ تم تسجيل الدفعة','success'); renderQardPage();
+}
+
+function renderQardPage() {
+  initQard();
+  const today=new Date().toISOString().split('T')[0];
+  ['qard-deposit-date','qard-loan-date','qard-repay-date'].forEach(id=>{
+    const el=document.getElementById(id); if(el&&!el.value) el.value=today;
+  });
+  const {balance,totalLent,totalRep}=getQardBalance();
+  const bEl=document.getElementById('qard-balance');
+  if(bEl){bEl.textContent=balance.toLocaleString('ar-EG');bEl.style.color=balance>=0?'var(--success)':'var(--danger)';}
+  const lEl=document.getElementById('qard-lent'); if(lEl) lEl.textContent=totalLent.toLocaleString('ar-EG');
+  const rEl=document.getElementById('qard-returned'); if(rEl) rEl.textContent=totalRep.toLocaleString('ar-EG');
+
+  const loansBody=document.getElementById('qard-loans-body');
+  if(loansBody){
+    if(!db.qard.loans.length){
+      loansBody.innerHTML='<tr><td colspan="7"><div class="empty"><div class="empty-icon">🤝</div><div class="empty-text">لا توجد قروض بعد</div></div></td></tr>';
+    } else {
+      loansBody.innerHTML=db.qard.loans.map(loan=>{
+        const repaid=(loan.repayments||[]).reduce((s,p)=>s+p.amount,0);
+        const remaining=loan.amount-repaid; const done=remaining<=0;
+        const pct=loan.amount>0?Math.round(repaid/loan.amount*100):0;
+        const repList=(loan.repayments||[]).map(p=>
+          `<small style="display:block;color:#5a7a5a;">↩ ${p.amount.toLocaleString('ar-EG')} ج (${formatDate(p.date)})${p.notes?' — '+p.notes:''}</small>`
+        ).join('');
+        return `<tr style="${done?'opacity:0.65':''}">
+          <td><strong>${loan.name}</strong><br><small style="color:#777;">${formatDate(loan.date)}</small></td>
+          <td class="balance-neg">${loan.amount.toLocaleString('ar-EG')} ج</td>
+          <td class="balance-pos">${repaid.toLocaleString('ar-EG')} ج${repList}</td>
+          <td class="${remaining>0?'balance-neg':'balance-pos'}">${remaining.toLocaleString('ar-EG')} ج</td>
+          <td><span class="badge" style="background:${done?'#d4edda':'#fff3cd'};color:${done?'#155724':'#856404'};">${done?'✅ مكتمل':'⏳ '+pct+'%'}</span></td>
+          <td style="font-size:12px;color:#777;">${loan.notes||'-'}</td>
+          <td style="display:flex;gap:4px;flex-wrap:wrap;">
+            ${!done?`<button class="btn btn-success btn-sm" onclick="openQardRepay(${loan.id})">💚 سداد</button>`:''}
+            <button class="btn btn-outline btn-sm" style="padding:4px 8px;" onclick="deleteQardLoan(${loan.id})">🗑️</button>
+          </td></tr>`;
+      }).join('');
+    }
+  }
+
+  const depBody=document.getElementById('qard-deposits-body');
+  if(depBody){
+    if(!db.qard.deposits.length){
+      depBody.innerHTML='<tr><td colspan="4"><div class="empty"><div class="empty-icon">💵</div><div class="empty-text">لا توجد إيداعات</div></div></td></tr>';
+    } else {
+      depBody.innerHTML=[...db.qard.deposits].reverse().map(d=>`<tr>
+        <td>${formatDate(d.date)}</td>
+        <td class="balance-pos">${d.amount.toLocaleString('ar-EG')} ج</td>
+        <td style="color:#5a7a5a;">${d.notes||'-'}</td>
+        <td><button class="btn btn-outline btn-sm" style="padding:4px 8px;" onclick="deleteQardDeposit(${d.id})">🗑️</button></td>
+      </tr>`).join('');
+    }
+  }
+}
+
 window.onload = loadDB;
 </script>
 </body>
