@@ -180,6 +180,7 @@
         <button class="btn btn-primary btn-sm" onclick="generateSixMonthsReport()">🗓️ تقرير آخر 6 شهور</button>
         <button class="btn btn-info btn-sm" onclick="exportActiveProjectsImage()">📸 تقرير المشاريع الفعالة</button>
         <button class="btn btn-accent btn-sm" onclick="openDonorCardSearch()">💳 بطاقة مساهم</button>
+        <button class="btn btn-primary btn-sm" onclick="generateTopDonorsReport()">🏆 أبطال التبرع</button>
         <button class="btn btn-warn btn-sm" onclick="generateGroupMessage(0)">📢 رسالة هذا الشهر</button>
         <button class="btn btn-outline btn-sm" onclick="generateGroupMessage(1)">📢 رسالة الشهر السابق</button>
     </div>
@@ -1286,6 +1287,121 @@ async function shareImageToWhatsApp() {
   }, 'image/png');
 }
 
+
+// ============================================================
+// 🏆 تقرير أبطال التبرع — آخر 6 شهور — أكواد فقط
+// ============================================================
+function generateTopDonorsReport() {
+  const now=new Date();
+  const last6Keys=[];
+  for(let i=5;i>=0;i--){
+    let m=now.getMonth()+1-i, y=now.getFullYear();
+    if(m<=0){m+=12;y--;}
+    last6Keys.push(`${y}-${String(m).padStart(2,'0')}`);
+  }
+
+  const privateIds=new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
+  const donorTotals={};
+  db.transactions
+    .filter(t=>t.type==='donation'&&t.donorId&&t.donorId!=='general'
+      &&t.date&&last6Keys.some(k=>t.date.startsWith(k))
+      &&!privateIds.has(t.projectId))
+    .forEach(t=>{donorTotals[t.donorId]=(donorTotals[t.donorId]||0)+t.amount;});
+
+  const sorted=Object.entries(donorTotals)
+    .map(([id,total])=>({donor:db.donors.find(d=>String(d.id)===String(id)),total}))
+    .filter(x=>x.donor)
+    .sort((a,b)=>b.total-a.total)
+    .slice(0,10);
+
+  if(!sorted.length) return toast('⚠️ لا توجد بيانات في آخر 6 شهور','error');
+
+  const overallTotal=sorted.reduce((s,x)=>s+x.total,0);
+  const DPR=2, W=1100, HDR=180, CARD=100, GAP=12, M=40, FTR=70;
+  const H=HDR+(sorted.length*(CARD+GAP))+GAP+FTR;
+  const cvs=document.getElementById('export-canvas');
+  cvs.width=W*DPR; cvs.height=H*DPR;
+  const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
+
+  // خلفية
+  ctx.fillStyle='#f2f7f3'; ctx.fillRect(0,0,W,H);
+
+  // هيدر
+  const gH=ctx.createLinearGradient(0,0,W,0);
+  gH.addColorStop(0,'#0a2e1a'); gH.addColorStop(1,'#2d8a56');
+  ctx.fillStyle=gH; ctx.fillRect(0,0,W,HDR);
+  ctx.font='46px Arial'; ctx.textAlign='center'; ctx.fillText('🏆',70,HDR/2+16);
+  ctx.fillStyle='white'; ctx.font='bold 46px Cairo,Arial';
+  ctx.fillText('أبطال التبرع — آخر 6 شهور',W/2,HDR/2-4);
+  ctx.fillStyle='#ffd166'; ctx.font='bold 20px Cairo,Arial';
+  ctx.fillText('إجمالي الفترة: '+overallTotal.toLocaleString('ar-EG')+' ج  |  '+new Date().toLocaleDateString('ar-EG'),W/2,HDR/2+34);
+
+  const medals=['🥇','🥈','🥉'];
+  const rankColors=['#c8860a','#7a8a8a','#8a5a2a'];
+  let y=HDR+GAP;
+
+  sorted.forEach((item,idx)=>{
+    const pct=overallTotal>0?item.total/overallTotal:0;
+    const txCount=db.transactions.filter(t=>t.type==='donation'
+      &&String(t.donorId)===String(item.donor.id)
+      &&last6Keys.some(k=>t.date&&t.date.startsWith(k))).length;
+
+    // بطاقة
+    ctx.shadowColor='rgba(0,0,0,0.07)'; ctx.shadowBlur=10; ctx.shadowOffsetY=4;
+    ctx.fillStyle=idx===0?'#fffdf0':idx===1?'#f8f9fa':idx===2?'#fdf6f0':'white';
+    roundRect(ctx,M,y,W-M*2,CARD,14); ctx.fill();
+    ctx.shadowColor='transparent'; ctx.shadowBlur=0;
+
+    const sColor=idx<3?rankColors[idx]:'#1a5c38';
+
+    // شريط لوني جانبي
+    ctx.fillStyle=sColor; roundRect(ctx,W-M-8,y,8,CARD,{tl:0,tr:14,bl:0,br:14}); ctx.fill();
+
+    // ميدالية / رقم
+    if(idx<3){
+      ctx.font='44px Arial'; ctx.textAlign='center'; ctx.fillText(medals[idx],M+46,y+CARD/2+14);
+    } else {
+      ctx.fillStyle='#e0e0e0'; roundRect(ctx,M+10,y+22,50,CARD-44,10); ctx.fill();
+      ctx.fillStyle='#666'; ctx.font='bold 22px Cairo,Arial'; ctx.textAlign='center';
+      ctx.fillText(idx+1,M+35,y+CARD/2+8);
+    }
+
+    // الكود فقط (تقرير جروب — خصوصية)
+    ctx.textAlign='right'; ctx.fillStyle='#0f3d25'; ctx.font='bold 32px Cairo,Arial';
+    ctx.fillText(item.donor.code,W-M-22,y+38);
+    ctx.fillStyle='#8a9a8a'; ctx.font='17px Cairo,Arial';
+    ctx.fillText(txCount+' مرة  |  '+Math.round(pct*100)+'% من الإجمالي',W-M-22,y+66);
+
+    // شريط التقدم
+    const barL=M+90, barTW=W-M*2-310;
+    const barFilledW=Math.max(Math.round(barTW*pct),8);
+    const barY=y+CARD/2-10;
+    ctx.fillStyle='#e0ece0'; roundRect(ctx,barL,barY,barTW,22,11); ctx.fill();
+    const gBar=ctx.createLinearGradient(barL,0,barL+barFilledW,0);
+    gBar.addColorStop(0,sColor); gBar.addColorStop(1,idx===0?'#f0c840':idx<3?'#aab8aa':'#3d8a5c');
+    ctx.fillStyle=gBar; roundRect(ctx,barL,barY,barFilledW,22,11); ctx.fill();
+    if(barFilledW>50){
+      ctx.fillStyle='white'; ctx.font='bold 14px Cairo,Arial'; ctx.textAlign='center';
+      ctx.fillText(Math.round(pct*100)+'%',barL+barFilledW/2,barY+16);
+    }
+
+    // المبلغ
+    ctx.textAlign='left'; ctx.fillStyle=sColor; ctx.font='bold 30px Cairo,Arial';
+    ctx.fillText(item.total.toLocaleString('ar-EG')+' ج',M+90,y+CARD/2+10);
+
+    y+=CARD+GAP;
+  });
+
+  // فوتر
+  ctx.fillStyle='#eaf2ea'; ctx.fillRect(0,y+4,W,FTR-4);
+  ctx.fillStyle='#5a7a5a'; ctx.font='bold 19px Cairo,Arial'; ctx.textAlign='center';
+  ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿  —  جزاكم الله خيراً',W/2,y+4+FTR/2+7);
+
+  const img=document.getElementById('img-preview');
+  img.src=cvs.toDataURL('image/png');
+  currentDownloadName='تقرير_أبطال_التبرع.png';
+  document.getElementById('img-modal').classList.add('open');
+}
 
 function openDonorCardSearch() {
   if(!db.donors.length) return toast('⚠️ لا يوجد مساهمون','error');
