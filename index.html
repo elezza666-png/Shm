@@ -166,6 +166,7 @@
       <button class="nav-btn" onclick="showPage('donors')">👥 المتبرعون</button>
       <button class="nav-btn" onclick="showPage('projects')">📋 المشاريع</button>
       <button class="nav-btn" onclick="showPage('qard')">🤝 القرض الحسن</button>
+      <button class="nav-btn" onclick="showPage('beneficiaries')">🏠 المستفيدون</button>
       <button class="nav-btn" onclick="showPage('settings')">⚙️ الإعدادات</button>
     </nav>
   </div>
@@ -230,6 +231,7 @@
         <div class="card-title">💸 تسجيل مصروف</div>
         <div class="form-grid">
           <div class="form-group"><label>البيان *</label><input type="text" id="exp-desc" placeholder="وصف المصروف"></div>
+          <div class="form-group"><label>🏠 المستفيد (اختياري)</label><select id="exp-beneficiary" style="padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-family:Cairo,sans-serif;font-size:14px;width:100%;"><option value="">-- بدون مستفيد --</option></select></div>
           <div class="form-group"><label>المبلغ (جنيه) *</label><input type="number" id="exp-amount" placeholder="0.00" min="1"></div>
           <div class="form-group"><label>التاريخ *</label><input type="date" id="exp-date"></div>
           <div class="form-group"><label>ملاحظات</label><input type="text" id="exp-notes" placeholder="ملاحظات اختيارية"></div>
@@ -317,6 +319,45 @@
         <tbody id="projects-table-body"><tr><td colspan="5"><div class="empty"><div class="empty-icon">⏳</div></div></td></tr></tbody>
       </table>
     </div>
+  </div>
+</div>
+
+<!-- BENEFICIARIES PAGE -->
+<div class="page" id="page-beneficiaries">
+  <div class="page-title"><div class="page-title-text">🏠 المستفيدون</div></div>
+
+  <div class="card">
+    <div class="card-title">➕ إضافة مستفيد جديد</div>
+    <div class="form-grid">
+      <div class="form-group"><label>كود المستفيد *</label><input type="text" id="ben-code" placeholder="B-001" dir="ltr" style="text-transform:uppercase;"></div>
+      <div class="form-group"><label>الاسم *</label><input type="text" id="ben-name" placeholder="اسم المستفيد"></div>
+      <div class="form-group span2" style="flex-direction:row;align-items:center;gap:10px;">
+        <input type="checkbox" id="ben-show-name" checked>
+        <label for="ben-show-name" style="margin:0;cursor:pointer;font-weight:600;">عرض الاسم في التقارير (لو مش محدد بيظهر الكود فقط)</label>
+      </div>
+      <div class="form-group span2"><label>ملاحظات</label><input type="text" id="ben-notes" placeholder="عنوان، تفاصيل..."></div>
+    </div>
+    <div style="margin-top:14px;display:flex;justify-content:flex-end;">
+      <button class="btn btn-primary" onclick="saveBeneficiary()">➕ إضافة</button>
+    </div>
+  </div>
+
+  <div class="card" style="padding:0;">
+    <div style="padding:16px;display:flex;justify-content:space-between;align-items:center;">
+      <div class="card-title" style="margin:0;">🏠 قائمة المستفيدين</div>
+    </div>
+    <div class="table-wrap" style="border:none;border-top:1px solid var(--border);border-radius:0 0 16px 16px;">
+      <table>
+        <thead><tr><th>الكود</th><th>الاسم</th><th>يظهر في التقارير</th><th>إجمالي ما استلم</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
+        <tbody id="ben-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- تقرير مستفيد -->
+  <div class="card" id="ben-report-card" style="display:none;">
+    <div class="card-title" id="ben-report-title">📋 تقرير المستفيد</div>
+    <div id="ben-report-body"></div>
   </div>
 </div>
 
@@ -513,7 +554,7 @@ const firebaseConfig = {
 };
 
 const WA_GROUP_LINK = 'https://chat.whatsapp.com/KQxUlARMPbWCdjFn6d3XKC';
-let db = { donors:[], projects:[], transactions:[], cases:[], qard:{deposits:[],loans:[]} };
+let db = { donors:[], projects:[], transactions:[], cases:[], beneficiaries:[], qard:{deposits:[],loans:[]} };
 let selectedProject = null, currentWaPhone = '', currentWaMessage = '', currentDownloadName = 'تقرير.png';
 let fbInitialized = false;
 
@@ -569,7 +610,8 @@ function _initFB() {
       if(Array.isArray(data.donors))       db.donors       = data.donors;
       if(Array.isArray(data.projects))     db.projects     = data.projects;
       if(Array.isArray(data.transactions)) db.transactions = data.transactions;
-      if(Array.isArray(data.cases))        db.cases        = data.cases;
+      if(Array.isArray(data.cases))          db.cases          = data.cases;
+      if(Array.isArray(data.beneficiaries)) db.beneficiaries  = data.beneficiaries;
       if(data.qard) db.qard = { deposits: Array.isArray(data.qard.deposits)?data.qard.deposits:[], loans: Array.isArray(data.qard.loans)?data.qard.loans:[] };
       try { localStorage.setItem('charity_db_v5', JSON.stringify(db)); } catch(e){}
       renderAll();
@@ -588,6 +630,7 @@ async function saveDB() {
     await firebase.database().ref('charity_db').set({
       donors: db.donors||[], projects: db.projects||[],
       transactions: db.transactions||[], cases: db.cases||[],
+      beneficiaries: db.beneficiaries||[],
       qard: { deposits: db.qard?.deposits||[], loans: db.qard?.loans||[] }
     });
   } catch(e) { toast('⚠️ تم الحفظ محلياً',''); }
@@ -643,7 +686,8 @@ function showPage(id) {
   const idx = pages.indexOf(id);
   if(idx >= 0 && document.querySelectorAll('.nav-btn')[idx]) 
     document.querySelectorAll('.nav-btn')[idx].classList.add('active');
-  if(id==='home')     renderHomePage();
+  if(id==='home')         renderHomePage();
+  if(id==='beneficiaries') renderBeneficiariesPage();
   if(id==='projects') renderProjectsTable();
   if(id==='donors')   renderDonorsTable();
   if(id==='qard') {
@@ -962,6 +1006,7 @@ function renderAll() {
   renderDonorsTable();
   renderProjectsTable();
   renderHomePage();
+  populateBeneficiarySelect();
   if(selectedProject && document.getElementById('tab-statement').classList.contains('active')) renderStatement();
   if(document.getElementById('page-qard')?.classList.contains('active')) renderQardPage();
 }
@@ -1744,6 +1789,95 @@ function renderQardPage() {
     }
   }
 }
+
+
+// ============================================================
+// 🏠 المستفيدون — الدوال الناقصة
+// ============================================================
+function getBenLabel(benId) {
+  if(!benId) return '';
+  if(!db.beneficiaries) return '';
+  const b=db.beneficiaries.find(x=>String(x.id)===String(benId));
+  if(!b) return '';
+  return b.showName ? b.name : b.code;
+}
+
+function populateBeneficiarySelect() {
+  if(!db.beneficiaries) db.beneficiaries=[];
+  const sel=document.getElementById('exp-beneficiary');
+  if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">-- بدون مستفيد --</option>';
+  db.beneficiaries.forEach(b=>{
+    sel.innerHTML+=`<option value="${b.id}">${b.showName?b.name:b.code} (${b.code})</option>`;
+  });
+  if(cur) sel.value=cur;
+}
+
+function showBenReport(benId) {
+  if(!db.beneficiaries) return;
+  const ben=db.beneficiaries.find(b=>String(b.id)===String(benId));
+  if(!ben) return;
+  const txns=db.transactions
+    .filter(t=>t.type==='expense'&&String(t.beneficiaryId)===String(benId))
+    .sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const total=txns.reduce((s,t)=>s+t.amount,0);
+  const card=document.getElementById('ben-report-card');
+  const title=document.getElementById('ben-report-title');
+  const body=document.getElementById('ben-report-body');
+  if(!card||!title||!body) return;
+  title.textContent='📋 تقرير المستفيد: '+(ben.showName?ben.name:ben.code)+' ('+ben.code+')';
+  if(!txns.length){
+    body.innerHTML='<div class="empty"><div class="empty-icon">📄</div><div class="empty-text">لا توجد مصروفات لهذا المستفيد</div></div>';
+  } else {
+    body.innerHTML=`
+      <div style="margin-bottom:12px;font-size:14px;color:var(--text-muted);">
+        إجمالي ما استلم: <strong style="color:var(--danger);font-size:16px;">${total.toLocaleString('ar-EG')} ج</strong>
+        — عدد المرات: <strong>${txns.length}</strong>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>التاريخ</th><th>الصندوق</th><th>المبلغ</th><th>البيان</th><th>ملاحظات</th></tr></thead>
+        <tbody>${txns.map(t=>{
+          const proj=db.projects.find(p=>String(p.id)===String(t.projectId));
+          return `<tr>
+            <td>${formatDate(t.date)}</td>
+            <td>${proj?proj.name:'-'}</td>
+            <td class="balance-neg">${t.amount.toLocaleString('ar-EG')} ج</td>
+            <td>${t.desc||'-'}</td>
+            <td style="color:#5a7a5a;">${t.notes||'-'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>`;
+  }
+  card.style.display='block';
+  card.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function renderBeneficiariesPage() {
+  if(!db.beneficiaries) db.beneficiaries=[];
+  const tbody=document.getElementById('ben-table-body');
+  if(!tbody) return;
+  if(!db.beneficiaries.length){
+    tbody.innerHTML='<tr><td colspan="6"><div class="empty"><div class="empty-icon">🏠</div><div class="empty-text">لا توجد مستفيدون بعد</div></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML=db.beneficiaries.map(b=>{
+    const total=db.transactions.filter(t=>t.type==='expense'&&String(t.beneficiaryId)===String(b.id)).reduce((s,t)=>s+t.amount,0);
+    const count=db.transactions.filter(t=>String(t.beneficiaryId)===String(b.id)).length;
+    return `<tr>
+      <td><span class="badge" style="background:var(--primary-dark);color:#ffd166;font-family:monospace;letter-spacing:1px;padding:4px 10px;">${b.code}</span></td>
+      <td><strong>${b.name}</strong></td>
+      <td style="text-align:center;">${b.showName?'<span style="color:var(--success);">✅ اسم</span>':'<span style="color:#aaa;">🔒 كود فقط</span>'}</td>
+      <td class="balance-neg">${total.toLocaleString('ar-EG')} ج <small style="color:#aaa;">(${count} مرة)</small></td>
+      <td style="font-size:12px;color:#5a7a5a;">${b.notes||'-'}</td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" onclick="showBenReport(${b.id})">📋 تقرير</button>
+        <button class="btn btn-outline btn-sm" style="padding:4px 8px;" onclick="deleteBeneficiary(${b.id})">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
 
 window.onload = loadDB;
 </script>
