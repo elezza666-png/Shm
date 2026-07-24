@@ -1879,6 +1879,40 @@ function renderBeneficiariesPage() {
 }
 
 
+// ============================================================
+// 🏠 المستفيدون — حفظ وحذف
+// ============================================================
+async function saveBeneficiary() {
+  if(!db.beneficiaries) db.beneficiaries=[];
+  const code     = document.getElementById('ben-code').value.trim().toUpperCase();
+  const name     = document.getElementById('ben-name').value.trim();
+  const showName = document.getElementById('ben-show-name').checked;
+  const notes    = document.getElementById('ben-notes').value.trim();
+  if(!code) return toast('⚠️ أدخل كود المستفيد','error');
+  if(!name) return toast('⚠️ أدخل الاسم','error');
+  if(db.beneficiaries.some(b=>b.code===code)) return toast('⛔ الكود مستخدم من قبل','error');
+  db.beneficiaries.push({id:Date.now(), code, name, showName, notes, createdAt:new Date().toISOString()});
+  await saveDB();
+  document.getElementById('ben-code').value='';
+  document.getElementById('ben-name').value='';
+  document.getElementById('ben-notes').value='';
+  document.getElementById('ben-show-name').checked=true;
+  toast('✅ تمت الإضافة: '+name,'success');
+  renderBeneficiariesPage();
+  populateBeneficiarySelect();
+}
+
+async function deleteBeneficiary(id) {
+  if(!confirm('حذف هذا المستفيد؟')) return;
+  if(!db.beneficiaries) db.beneficiaries=[];
+  db.beneficiaries=db.beneficiaries.filter(b=>b.id!==id);
+  await saveDB();
+  toast('تم الحذف','success');
+  renderBeneficiariesPage();
+  populateBeneficiarySelect();
+}
+
+
 window.onload = loadDB;
 </script>
 </body>
