@@ -573,9 +573,23 @@ let fbInitialized = false;
   } catch(e) {}
 })();
 
+let pendingSync = 0; // عدد العمليات المنتظرة
+
 function setStatus(t, off) {
   const el = document.getElementById('firebase-status');
-  if(el) { el.textContent = t; el.className = off ? 'offline' : ''; }
+  if(!el) return;
+  const pendingBadge = pendingSync > 0
+    ? ` <span style="background:#f0a500;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-right:4px;">⏳ ${pendingSync}</span>`
+    : '';
+  el.innerHTML = t + pendingBadge;
+  el.className = off ? 'offline' : '';
+}
+
+function setPending(delta) {
+  pendingSync = Math.max(0, pendingSync + delta);
+  // اعد رسم الحالة الحالية
+  const el = document.getElementById('firebase-status');
+  if(el) setStatus(el.textContent.replace(/⏳.*/,'').trim(), el.classList.contains('offline'));
 }
 
 function loadDB() {
@@ -626,6 +640,7 @@ async function saveDB() {
   try { localStorage.setItem('charity_db_v5', JSON.stringify(db)); } catch(e){}
   renderAll();
   if(!fbInitialized || typeof firebase==='undefined') return;
+  setPending(+1);
   try {
     await firebase.database().ref('charity_db').set({
       donors: db.donors||[], projects: db.projects||[],
@@ -633,7 +648,11 @@ async function saveDB() {
       beneficiaries: db.beneficiaries||[],
       qard: { deposits: db.qard?.deposits||[], loans: db.qard?.loans||[] }
     });
-  } catch(e) { toast('⚠️ تم الحفظ محلياً',''); }
+    setPending(-1);
+  } catch(e) {
+    setPending(-1);
+    toast('⚠️ تم الحفظ محلياً','');
+  }
 }
 
 // ===== التصدير والإستيراد =====
@@ -1912,6 +1931,71 @@ async function deleteBeneficiary(id) {
   populateBeneficiarySelect();
 }
 
+
+// ============================================================
+// 📱 استيراد من الهاتف — إدخال رقم الهاتف مباشرة
+// ============================================================
+function importFromContacts() {
+  // إنشاء modal بسيط لإدخال الرقم — يفتح لوحة الاتصال على الموبايل
+  const existing = document.getElementById('import-phone-modal');
+  if(existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.id = 'import-phone-modal';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:400px;">
+      <div class="modal-title">📱 إدخال رقم الهاتف</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+        أدخل رقم الهاتف يدوياً أو اختره من جهات الاتصال عبر لوحة الأرقام
+      </p>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:13px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:6px;">رقم الهاتف *</label>
+        <input type="tel" id="import-phone-input"
+          placeholder="01xxxxxxxxx"
+          dir="ltr"
+          style="width:100%;padding:12px 14px;border:2px solid var(--border);border-radius:10px;font-family:Cairo,sans-serif;font-size:16px;letter-spacing:1px;"
+          oninput="this.value=this.value.replace(/[^0-9+]/g,'')">
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:13px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:6px;">الاسم (اختياري)</label>
+        <input type="text" id="import-name-input"
+          placeholder="اسم المتبرع"
+          style="width:100%;padding:12px 14px;border:2px solid var(--border);border-radius:10px;font-family:Cairo,sans-serif;font-size:14px;">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('import-phone-modal').remove()">إغلاق</button>
+        <button class="btn btn-primary" onclick="applyImportedContact()">✅ إضافة للنموذج</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
+
+  // فتح لوحة الأرقام مباشرة على الموبايل
+  setTimeout(()=>{
+    const inp = document.getElementById('import-phone-input');
+    if(inp) inp.focus();
+  }, 150);
+}
+
+function applyImportedContact() {
+  const phone = document.getElementById('import-phone-input')?.value.trim();
+  const name  = document.getElementById('import-name-input')?.value.trim();
+  if(!phone) return toast('⚠️ أدخل رقم الهاتف','error');
+
+  // نقل البيانات لحقول نموذج المتبرع
+  const phoneField = document.getElementById('donor-phone');
+  const nameField  = document.getElementById('donor-name');
+  if(phoneField) phoneField.value = phone;
+  if(nameField && name) nameField.value = name;
+
+  document.getElementById('import-phone-modal')?.remove();
+  toast('✅ تم نقل البيانات للنموذج','success');
+
+  // التركيز على حقل الاسم لو فارغ، أو على حقل الكود
+  if(nameField && !nameField.value) nameField.focus();
+  else document.getElementById('new-donor-code')?.focus();
+}
 
 window.onload = loadDB;
 </script>
