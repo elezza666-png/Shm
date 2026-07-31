@@ -144,6 +144,8 @@
     
     #firebase-status { font-size: 11px; padding: 4px 10px; border-radius: 20px; background: #e8f5e9; color: #1b5e20; font-weight: bold; }
     #firebase-status.offline { background: #fff3e0; color: #e65100; }
+    .btn:disabled, .btn[data-loading] { opacity: 0.6; cursor: not-allowed; pointer-events: none; }
+    .btn[data-loading]::after { content: ' ⏳'; }
 
     #pdf-container { display: none; }
   </style>
@@ -223,7 +225,7 @@
           <div class="form-group"><label>التاريخ *</label><input type="date" id="don-date"></div>
           <div class="form-group"><label>ملاحظات</label><input type="text" id="don-notes" placeholder="ملاحظات اختيارية"></div>
         </div>
-        <div style="margin-top:16px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="saveDonation()">✅ حفظ المساهمة</button></div>
+        <div style="margin-top:16px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="safeClick(this, saveDonation)">✅ حفظ المساهمة</button></div>
       </div>
     </div>
     <div class="tab-content" id="tab-expense">
@@ -236,7 +238,7 @@
           <div class="form-group"><label>التاريخ *</label><input type="date" id="exp-date"></div>
           <div class="form-group"><label>ملاحظات</label><input type="text" id="exp-notes" placeholder="ملاحظات اختيارية"></div>
         </div>
-        <div style="margin-top:16px;display:flex;justify-content:flex-end;"><button class="btn btn-danger" onclick="saveExpense()">💸 حفظ المصروف</button></div>
+        <div style="margin-top:16px;display:flex;justify-content:flex-end;"><button class="btn btn-danger" onclick="safeClick(this, saveExpense)">💸 حفظ المصروف</button></div>
       </div>
     </div>
     <div class="tab-content" id="tab-statement">
@@ -257,7 +259,7 @@
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
       <div class="card-title" style="margin:0;">➕ إضافة متبرع جديد</div>
-      <button class="btn btn-outline btn-sm" onclick="importFromContacts()">📱 استيراد من الهاتف</button>
+
     </div>
     <div class="form-grid">
       <div class="form-group">
@@ -277,7 +279,7 @@
       <div class="form-group"><label>رقم الهاتف</label><input type="tel" id="donor-phone" placeholder="اختياري" dir="ltr"></div>
       <div class="form-group span2"><label>ملاحظات</label><input type="text" id="donor-notes" placeholder="ملاحظات اختيارية"></div>
     </div>
-    <div style="margin-top:16px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="saveDonor()">✅ إضافة المتبرع</button></div>
+    <div style="margin-top:16px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="safeClick(this, saveDonor)">✅ إضافة المتبرع</button></div>
   </div>
   <div class="card" style="padding:0;">
     <div style="padding:18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
@@ -309,7 +311,7 @@
           <label style="margin:0; cursor:pointer;" for="proj-private">🔒 مشروع خاص (يخفى من تقرير المشاريع العام)</label>
       </div>
     </div>
-    <div style="margin-top:16px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="saveProject()">✅ إضافة المشروع</button></div>
+    <div style="margin-top:16px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="safeClick(this, saveProject)">✅ إضافة المشروع</button></div>
   </div>
   <div class="card" style="padding:0;">
     <div style="padding:18px;"><div class="card-title" style="margin:0;">📋 قائمة المشاريع (الفعالة والمؤرشفة)</div></div>
@@ -338,7 +340,7 @@
       <div class="form-group span2"><label>ملاحظات</label><input type="text" id="ben-notes" placeholder="عنوان، تفاصيل..."></div>
     </div>
     <div style="margin-top:14px;display:flex;justify-content:flex-end;">
-      <button class="btn btn-primary" onclick="saveBeneficiary()">➕ إضافة</button>
+      <button class="btn btn-primary" onclick="safeClick(this, saveBeneficiary)">➕ إضافة</button>
     </div>
   </div>
 
@@ -378,7 +380,7 @@
       <div class="form-group"><label>التاريخ *</label><input type="date" id="qard-deposit-date"></div>
       <div class="form-group span2"><label>ملاحظات</label><input type="text" id="qard-deposit-notes" placeholder="مصدر الإيداع..."></div>
     </div>
-    <div style="margin-top:14px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="saveQardDeposit()">💵 إيداع</button></div>
+    <div style="margin-top:14px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="safeClick(this, saveQardDeposit)">💵 إيداع</button></div>
   </div>
 
   <div class="card">
@@ -389,7 +391,7 @@
       <div class="form-group"><label>التاريخ *</label><input type="date" id="qard-loan-date"></div>
       <div class="form-group"><label>ملاحظات السداد</label><input type="text" id="qard-loan-notes" placeholder="مثال: يسدد 500 ج شهرياً"></div>
     </div>
-    <div style="margin-top:14px;display:flex;justify-content:flex-end;"><button class="btn btn-accent" onclick="saveQardLoan()">📤 منح القرض</button></div>
+    <div style="margin-top:14px;display:flex;justify-content:flex-end;"><button class="btn btn-accent" onclick="safeClick(this, saveQardLoan)">📤 منح القرض</button></div>
   </div>
 
   <div class="card" style="padding:0;">
@@ -424,7 +426,7 @@
     <div class="edit-form-group"><label>ملاحظات</label><input type="text" id="qard-repay-notes" placeholder="اختيارية"></div>
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" onclick="closeModal('qard-repay-modal')">إلغاء</button>
-      <button class="btn btn-primary" onclick="saveQardRepay()">✅ حفظ الدفعة</button>
+      <button class="btn btn-primary" onclick="safeClick(this, saveQardRepay)">✅ حفظ الدفعة</button>
     </div>
   </div>
 </div>
@@ -1995,6 +1997,27 @@ function applyImportedContact() {
   // التركيز على حقل الاسم لو فارغ، أو على حقل الكود
   if(nameField && !nameField.value) nameField.focus();
   else document.getElementById('new-donor-code')?.focus();
+}
+
+// ============================================================
+// 🔒 تأمين الأزرار من النقر المتعدد
+// ============================================================
+function lockBtn(el) {
+  if(!el) return;
+  el.setAttribute('data-loading', '1');
+  el.disabled = true;
+}
+function unlockBtn(el) {
+  if(!el) return;
+  el.removeAttribute('data-loading');
+  el.disabled = false;
+}
+// wrapper يلف أي async function ويؤمن الزر
+async function safeClick(btn, fn) {
+  if(btn && btn.getAttribute('data-loading')) return; // منع النقر المتعدد
+  lockBtn(btn);
+  try { await fn(); }
+  finally { unlockBtn(btn); }
 }
 
 window.onload = loadDB;
