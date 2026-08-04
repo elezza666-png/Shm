@@ -1185,157 +1185,211 @@ function exportActiveProjectsImage() {
 // ----------------------------------------------------
 function generateSixMonthsReport() {
   const now = new Date();
-  let currentMonth = now.getMonth() + 1; 
-  let currentYear = now.getFullYear();
-
-  // جلب آخر 6 شهور (تنازلياً)
-  let last6Months = [];
-  for (let i = 5; i >= 0; i--) {
-    let m = currentMonth - i;
-    let y = currentYear;
-    if (m <= 0) { m += 12; y -= 1; }
-    last6Months.push({ m, y, label: `${m}/${y}`, key: `${y}-${String(m).padStart(2,'0')}` });
+  let last6 = [];
+  for(let i=5;i>=0;i--){
+    let m=now.getMonth()+1-i, y=now.getFullYear();
+    if(m<=0){m+=12;y--;}
+    last6.push({m,y,label:`${m}/${y}`,key:`${y}-${String(m).padStart(2,'0')}`});
   }
 
-  // فلترة الحركات بناءً على الـ 6 شهور — بدون الصناديق الخاصة
-  const startKey = last6Months[0].key;
-  const _privateSet = new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
-  const txns = db.transactions.filter(t => t.date && t.date >= startKey && !_privateSet.has(t.projectId));
-  if(!txns.length) return toast('⚠️ لا توجد حركات مسجلة في آخر 6 شهور', 'error');
+  const _priv = new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
+  const txns  = db.transactions.filter(t=>t.date&&t.date>=last6[0].key&&!_priv.has(t.projectId));
+  if(!txns.length) return toast('⚠️ لا توجد حركات في آخر 6 شهور','error');
 
-  const monthlyStats = {}; last6Months.forEach(x => monthlyStats[x.key] = { in: 0, out: 0, donors: new Set() });
-  const donorStats = {}; 
-  let hasGeneral = false;
+  // تجميع البيانات
+  const monthly={};
+  last6.forEach(x=>monthly[x.key]={in:0,out:0,donors:new Set()});
+  const dStats={};
 
-  txns.forEach(t => {
-      const monthKey = t.date.substring(0, 7); // YYYY-MM
-      if(!monthlyStats[monthKey]) return; // خارج الـ 6 شهور
-
-      if (t.type === 'donation') {
-          monthlyStats[monthKey].in += t.amount;
-          if (t.donorId === 'general') {
-              hasGeneral = true;
-              if(!donorStats['general']) donorStats['general'] = { total: 0 };
-              donorStats['general'][monthKey] = (donorStats['general'][monthKey] || 0) + t.amount;
-              donorStats['general'].total += t.amount;
-          } else if (t.donorId) {
-              monthlyStats[monthKey].donors.add(t.donorId);
-              if(!donorStats[t.donorId]) donorStats[t.donorId] = { total: 0 };
-              donorStats[t.donorId][monthKey] = (donorStats[t.donorId][monthKey] || 0) + t.amount;
-              donorStats[t.donorId].total += t.amount;
-          }
-      } else if (t.type === 'expense') {
-          monthlyStats[monthKey].out += t.amount;
+  txns.forEach(t=>{
+    const mk=t.date.substring(0,7);
+    if(!monthly[mk]) return;
+    if(t.type==='donation'){
+      monthly[mk].in+=t.amount;
+      if(t.donorId&&t.donorId!=='general'){
+        monthly[mk].donors.add(t.donorId);
+        if(!dStats[t.donorId])dStats[t.donorId]={total:0};
+        dStats[t.donorId][mk]=(dStats[t.donorId][mk]||0)+t.amount;
+        dStats[t.donorId].total+=t.amount;
       }
+    } else {
+      monthly[mk].out+=t.amount;
+    }
   });
 
-  const sortedDonorIds = Object.keys(donorStats).filter(id => id !== 'general').sort((a,b) => donorStats[b].total - donorStats[a].total);
+  // ترتيب المساهمين تنازلياً
+  const sorted=Object.keys(dStats).sort((a,b)=>dStats[b].total-dStats[a].total);
+  const totalRows=sorted.length;
+  if(!totalRows) return toast('⚠️ لا توجد مساهمات شخصية في آخر 6 شهور','error');
 
-  // إعدادات الكانفاس بأبعاد كبيرة وخطوط واضحة
-  const DPR = 2, W = 1300, HEADER_H = 160, ROW_H = 65;
-  const activeMonthsKeys = last6Months.map(x=>x.key).filter(k => monthlyStats[k].in > 0 || monthlyStats[k].out > 0);
-  const summaryBoxH = (activeMonthsKeys.length * 40) + 70;
-  const FOOTER_H = 50;
-  
-  const totalRows = sortedDonorIds.length + (hasGeneral ? 1 : 0);
-  const H = HEADER_H + 70 + (totalRows * ROW_H) + 70 + summaryBoxH + FOOTER_H;
+  // ============================================================
+  // أبعاد الكانفاس
+  // ============================================================
+  const DPR=2;
+  // عرض ثابت لكل عمود
+  const COL_CODE  = 160;  // الكود
+  const COL_MONTH = 150;  // كل شهر
+  const COL_TOTAL = 170;  // الإجمالي
+  const MARGIN    = 20;
+  const W = MARGIN + COL_CODE + (6*COL_MONTH) + COL_TOTAL + MARGIN;
+  const HDR_H   = 160;
+  const TH_H    = 52;
+  const ROW_H   = 52;
+  const FOOT_H  = 52;
+  const SUM_H   = 44 * last6.filter(x=>monthly[x.key].in>0||monthly[x.key].out>0).length + 70;
+  const H = HDR_H + TH_H + (totalRows*ROW_H) + ROW_H + SUM_H + FOOT_H + 20;
 
-  const cvs = document.getElementById('export-canvas'); cvs.width = W*DPR; cvs.height = H*DPR;
-  const ctx = cvs.getContext('2d'); ctx.scale(DPR,DPR);
+  const cvs=document.getElementById('export-canvas');
+  cvs.width=W*DPR; cvs.height=H*DPR;
+  const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
 
-  ctx.fillStyle='#f9fcf9'; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle = '#0f3d25'; ctx.fillRect(0,0,W, HEADER_H);
-  
-  ctx.textAlign='center'; ctx.fillStyle='white'; 
-  ctx.font='bold 50px Cairo,Arial'; ctx.fillText(`📊 حصاد مساهمات آخر 6 شهور`, W/2, 75);
-  ctx.fillStyle='#ffd166'; ctx.font='bold 24px Cairo,Arial'; ctx.fillText('عرض تفصيلي للمساهمين وإجمالي الوارد والمصروفات', W/2, 125);
+  // خلفية
+  ctx.fillStyle='#f2f7f3'; ctx.fillRect(0,0,W,H);
 
-  const TY = HEADER_H + 30;
-  const codeWidth = 250, totalWidth = 200;
-  const colCodeX = W - 30; 
-  const colTotalX = 30 + totalWidth; 
-  const availableSpaceForMonths = W - codeWidth - totalWidth - 80;
-  const monthColW = availableSpaceForMonths / 6; // 6 أعمدة فقط
-  
-  const monthXs = [];
-  last6Months.forEach((m, i) => { monthXs[i] = W - 30 - codeWidth - (i)*monthColW; });
+  // هيدر
+  const gH=ctx.createLinearGradient(0,0,W,HDR_H);
+  gH.addColorStop(0,'#0a2e1a'); gH.addColorStop(1,'#2d8a56');
+  ctx.fillStyle=gH; ctx.fillRect(0,0,W,HDR_H);
+  ctx.font='38px Arial'; ctx.textAlign='center'; ctx.fillText('📊',55,HDR_H/2+14);
+  ctx.fillStyle='white'; ctx.font='bold 42px Cairo,Arial';
+  ctx.fillText('حصاد مساهمات آخر 6 شهور',W/2,HDR_H/2-8);
+  ctx.fillStyle='#ffd166'; ctx.font='bold 20px Cairo,Arial';
+  ctx.fillText('الوارد والمصروفات والصافي — الأكواد فقط',W/2,HDR_H/2+34);
 
+  // ============================================================
+  // دالة مساعدة: حساب X مركز كل عمود (RTL — الكود على اليمين)
+  // ============================================================
+  // ترتيب الأعمدة من اليمين لليسار:
+  // [MARGIN] [COD] [M0][M1][M2][M3][M4][M5] [TOT] [MARGIN]
+  const colCX = {
+    code:  W - MARGIN - COL_CODE/2,
+  };
+  last6.forEach((m,i)=>{
+    colCX['m'+i] = W - MARGIN - COL_CODE - (i+0.5)*COL_MONTH;
+  });
+  colCX.total = MARGIN + COL_TOTAL/2;
+
+  // ============================================================
   // رأس الجدول
-  ctx.fillStyle='#1a5c38'; ctx.beginPath(); ctx.roundRect(20, TY, W-40, 60, 10); ctx.fill();
-  ctx.fillStyle='white'; ctx.font='bold 24px Cairo,Arial';
-  
-  ctx.textAlign = 'right'; ctx.fillText('المساهم (الكود)', colCodeX - 20, TY + 40);
-  ctx.textAlign = 'center';
-  last6Months.forEach((m, i) => { ctx.fillText(m.label, monthXs[i] - monthColW/2, TY + 40); });
-  ctx.fillText('الإجمالي (ج)', colTotalX - totalWidth/2, TY + 40);
+  // ============================================================
+  let curY = HDR_H;
+  const gTH=ctx.createLinearGradient(0,curY,0,curY+TH_H);
+  gTH.addColorStop(0,'#1a5c38'); gTH.addColorStop(1,'#0f3d25');
+  ctx.fillStyle=gTH; ctx.fillRect(MARGIN,curY,W-MARGIN*2,TH_H);
 
-  let currentY = TY + 65;
-  let overallTotalIn = 0;
+  ctx.fillStyle='white'; ctx.font='bold 19px Cairo,Arial'; ctx.textAlign='center';
+  ctx.fillText('الكود',colCX.code,curY+TH_H/2+7);
+  last6.forEach((m,i)=> ctx.fillText(m.label,colCX['m'+i],curY+TH_H/2+7));
+  ctx.fillStyle='#ffd166'; ctx.font='bold 19px Cairo,Arial';
+  ctx.fillText('الإجمالي',colCX.total,curY+TH_H/2+7);
 
-  function drawMatrixRow(label, statsObj, isHighlight) {
-      if(isHighlight) { ctx.fillStyle = '#fffcf0'; ctx.fillRect(20, currentY, W-40, ROW_H); }
-      else { ctx.fillStyle = '#ffffff'; ctx.fillRect(20, currentY, W-40, ROW_H); }
-      
-      ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1; ctx.beginPath();
-      ctx.moveTo(20, currentY + ROW_H); ctx.lineTo(W-20, currentY + ROW_H); ctx.stroke();
-
-      ctx.fillStyle = '#111'; ctx.font = isHighlight ? 'bold 24px Cairo,Arial' : 'bold 22px Cairo,Arial';
-      ctx.textAlign = 'right'; ctx.fillText(label, colCodeX - 20, currentY + 40);
-      
-      ctx.textAlign = 'center'; ctx.fillStyle = '#27ae60'; ctx.font = 'bold 24px Cairo,Arial';
-      last6Months.forEach((m, i) => {
-          const val = statsObj[m.key] || 0;
-          if(val > 0) ctx.fillText(val.toLocaleString('ar-EG'), monthXs[i] - monthColW/2, currentY + 40);
-          else { ctx.fillStyle = '#ccc'; ctx.fillText('-', monthXs[i] - monthColW/2, currentY + 40); ctx.fillStyle = '#27ae60'; }
-      });
-      
-      ctx.fillStyle = '#1a5c38'; ctx.font = 'bold 26px Cairo,Arial';
-      ctx.fillText(statsObj.total.toLocaleString('ar-EG'), colTotalX - totalWidth/2, currentY + 40);
-      currentY += ROW_H;
-  }
-
-  if(hasGeneral) drawMatrixRow('🌟 إيراد عام', donorStats['general'], true);
-  sortedDonorIds.forEach(dId => {
-      const d = db.donors.find(x=>x.id == dId);
-      const label = d ? d.code : 'غير معروف';
-      drawMatrixRow(label, donorStats[dId], false);
+  // خطوط فاصلة عمودية في الهيدر
+  ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1;
+  [colCX.code-COL_CODE/2, ...last6.map((_,i)=>colCX['m'+i]-COL_MONTH/2), colCX.total-COL_TOTAL/2].forEach(x=>{
+    ctx.beginPath(); ctx.moveTo(x,curY+6); ctx.lineTo(x,curY+TH_H-6); ctx.stroke();
   });
 
-  // الإجمالي أسفل الجدول
-  ctx.fillStyle = '#e8efe9'; ctx.fillRect(20, currentY, W-40, ROW_H);
-  ctx.fillStyle = '#1a5c38'; ctx.font = 'bold 26px Cairo,Arial';
-  ctx.textAlign = 'right'; ctx.fillText('إجمالي الوارد الشهري', colCodeX - 20, currentY + 42);
-  ctx.textAlign = 'center';
-  last6Months.forEach((m, i) => {
-      const v = monthlyStats[m.key].in; overallTotalIn += v;
-      ctx.fillText(v > 0 ? v.toLocaleString('ar-EG') : '-', monthXs[i] - monthColW/2, currentY + 42);
-  });
-  ctx.fillText(overallTotalIn.toLocaleString('ar-EG'), colTotalX - totalWidth/2, currentY + 42);
-  
-  currentY += ROW_H + 40;
-  ctx.fillStyle = '#0f3d25'; ctx.beginPath(); ctx.roundRect(40, currentY, W-80, summaryBoxH, 12); ctx.fill();
-  ctx.fillStyle = 'white'; ctx.textAlign = 'center'; ctx.font = 'bold 30px Cairo,Arial';
-  ctx.fillText('📝 ملخص حركة الشهور الفعالة', W/2, currentY + 45);
-  
-  currentY += 85;
-  ctx.textAlign = 'right'; ctx.font = 'bold 22px Cairo,Arial';
-  
-  activeMonthsKeys.forEach(k => {
-      const parts = k.split('-'); const label = `${parts[1]}/${parts[0]}`;
-      const cIn = monthlyStats[k].in, cOut = monthlyStats[k].out, count = monthlyStats[k].donors.size;
-      const net = cIn - cOut;
-      const line = `🗓️ شهر ${label}: ساهم (${count}) مساهم بإجمالي وارد [ ${cIn.toLocaleString('ar-EG')} ج ]  |  المصروفات: [ ${cOut.toLocaleString('ar-EG')} ج ]  |  الصافي: [ ${net.toLocaleString('ar-EG')} ج ]`;
-      ctx.fillText(line, W - 80, currentY);
-      currentY += 40;
+  curY += TH_H;
+
+  // ============================================================
+  // صفوف البيانات
+  // ============================================================
+  sorted.forEach((dId,idx)=>{
+    const donor=db.donors.find(d=>String(d.id)===String(dId));
+    const label=donor?donor.code:'???';
+    const stat=dStats[dId];
+
+    // خلفية الصف
+    ctx.fillStyle=idx%2===0?'#ffffff':'#eef6f0';
+    ctx.fillRect(MARGIN,curY,W-MARGIN*2,ROW_H);
+
+    // فاصل أسفل الصف
+    ctx.strokeStyle='#d4e8d4'; ctx.lineWidth=0.7;
+    ctx.beginPath(); ctx.moveTo(MARGIN,curY+ROW_H); ctx.lineTo(W-MARGIN,curY+ROW_H); ctx.stroke();
+
+    // الكود
+    ctx.fillStyle='#0f3d25'; ctx.font='bold 19px Cairo,Arial'; ctx.textAlign='center';
+    ctx.fillText(label,colCX.code,curY+ROW_H/2+7);
+
+    // قيم الأشهر
+    last6.forEach((m,i)=>{
+      const val=stat[m.key]||0;
+      if(val>0){
+        ctx.fillStyle='#1a5c38'; ctx.font='bold 18px Cairo,Arial';
+        ctx.fillText(val.toLocaleString('ar-EG'),colCX['m'+i],curY+ROW_H/2+7);
+      } else {
+        ctx.fillStyle='#c0c8c0'; ctx.font='18px Cairo,Arial';
+        ctx.fillText('—',colCX['m'+i],curY+ROW_H/2+7);
+      }
+    });
+
+    // الإجمالي
+    ctx.fillStyle='#0f3d25'; ctx.font='bold 20px Cairo,Arial';
+    ctx.fillText(stat.total.toLocaleString('ar-EG'),colCX.total,curY+ROW_H/2+7);
+
+    // فواصل عمودية
+    ctx.strokeStyle='#e0eee0'; ctx.lineWidth=0.5;
+    [colCX.code-COL_CODE/2,...last6.map((_,i)=>colCX['m'+i]-COL_MONTH/2),colCX.total-COL_TOTAL/2].forEach(x=>{
+      ctx.beginPath(); ctx.moveTo(x,curY+4); ctx.lineTo(x,curY+ROW_H-4); ctx.stroke();
+    });
+
+    curY+=ROW_H;
   });
 
-  ctx.textAlign='center'; ctx.fillStyle='#88a888'; ctx.font='bold 18px Cairo,Arial';
-  ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿', W/2, H - 20);
+  // ============================================================
+  // صف الإجمالي الشهري
+  // ============================================================
+  ctx.fillStyle='#1a5c38'; ctx.fillRect(MARGIN,curY,W-MARGIN*2,ROW_H);
+  ctx.fillStyle='white'; ctx.font='bold 19px Cairo,Arial'; ctx.textAlign='center';
+  ctx.fillText('إجمالي الوارد',colCX.code,curY+ROW_H/2+7);
+  let grandTotal=0;
+  last6.forEach((m,i)=>{
+    const v=monthly[m.key].in;
+    grandTotal+=v;
+    ctx.fillStyle=v>0?'#ffd166':'rgba(255,255,255,0.4)';
+    ctx.font=v>0?'bold 19px Cairo,Arial':'18px Cairo,Arial';
+    ctx.fillText(v>0?v.toLocaleString('ar-EG'):'—',colCX['m'+i],curY+ROW_H/2+7);
+  });
+  ctx.fillStyle='#ffd166'; ctx.font='bold 22px Cairo,Arial';
+  ctx.fillText(grandTotal.toLocaleString('ar-EG'),colCX.total,curY+ROW_H/2+7);
+  curY+=ROW_H+16;
 
-  const img=document.getElementById('img-preview'); img.src=cvs.toDataURL('image/png');
-  currentDownloadName = `تقرير_حصاد_6شهور.png`;
+  // ============================================================
+  // ملخص الشهور
+  // ============================================================
+  const activeMonths=last6.filter(x=>monthly[x.key].in>0||monthly[x.key].out>0);
+  const gSum=ctx.createLinearGradient(MARGIN,curY,W-MARGIN,curY);
+  gSum.addColorStop(0,'#0a2e1a'); gSum.addColorStop(1,'#1a5c38');
+  ctx.fillStyle=gSum;
+  roundRect(ctx,MARGIN,curY,W-MARGIN*2,SUM_H,14); ctx.fill();
+
+  ctx.fillStyle='white'; ctx.textAlign='center'; ctx.font='bold 22px Cairo,Arial';
+  ctx.fillText('📝 ملخص الشهور الفعالة',W/2,curY+38);
+  ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(MARGIN+20,curY+48); ctx.lineTo(W-MARGIN-20,curY+48); ctx.stroke();
+
+  let sY=curY+56;
+  activeMonths.forEach(m=>{
+    const cIn=monthly[m.key].in, cOut=monthly[m.key].out;
+    const net=cIn-cOut, cnt=monthly[m.key].donors.size;
+    ctx.font='bold 18px Cairo,Arial'; ctx.textAlign='right';
+    ctx.fillStyle=net>=0?'#a8e6c0':'#f5a8a8';
+    const line=`🗓️ ${m.label}   مساهمون: ${cnt}   وارد: ${cIn.toLocaleString('ar-EG')} ج   صادر: ${cOut.toLocaleString('ar-EG')} ج   صافي: ${net.toLocaleString('ar-EG')} ج`;
+    ctx.fillText(line,W-MARGIN-16,sY);
+    sY+=44;
+  });
+  curY+=SUM_H+12;
+
+  // فوتر
+  ctx.fillStyle='#7a9a7a'; ctx.font='bold 17px Cairo,Arial'; ctx.textAlign='center';
+  ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿  —  جزاكم الله خيراً',W/2,curY+30);
+
+  const img=document.getElementById('img-preview');
+  img.src=cvs.toDataURL('image/png');
+  currentDownloadName='تقرير_حصاد_6شهور.png';
   document.getElementById('img-modal').classList.add('open');
 }
+
 
 function downloadImage(){
   const cvs=document.getElementById('export-canvas'); const link=document.createElement('a'); link.download=currentDownloadName; link.href=cvs.toDataURL('image/png'); link.click();
