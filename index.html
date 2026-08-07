@@ -472,6 +472,23 @@
   </div>
 </div>
 
+<!-- QARD EDIT REPAYMENT MODAL -->
+<div class="modal-overlay" id="qard-edit-repay-modal">
+  <div class="modal">
+    <div class="modal-title">✏️ تعديل دفعة السداد</div>
+    <input type="hidden" id="qard-edit-repay-loan-id">
+    <input type="hidden" id="qard-edit-repay-id">
+    <div id="qard-edit-repay-info" style="background:#e8f5e9;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.8;"></div>
+    <div class="edit-form-group"><label>مبلغ الدفعة (جنيه) *</label><input type="number" id="qard-edit-repay-amount" min="1"></div>
+    <div class="edit-form-group"><label>التاريخ *</label><input type="date" id="qard-edit-repay-date"></div>
+    <div class="edit-form-group"><label>ملاحظات</label><input type="text" id="qard-edit-repay-notes"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('qard-edit-repay-modal')">إلغاء</button>
+      <button class="btn btn-primary" onclick="safeClick(this, saveEditQardRepay)">💾 حفظ التعديل</button>
+    </div>
+  </div>
+</div>
+
 <!-- SETTINGS PAGE -->
 <div class="page" id="page-settings">
   <div class="page-title">
@@ -2007,6 +2024,60 @@ async function saveEditQardDeposit(){
   toast('✅ تم حفظ التعديل','success'); renderQardPage();
 }
 
+async function deleteQardRepayment(loanId, repId){
+  if(!confirm('حذف دفعة السداد دي؟')) return;
+  initQard();
+  const loan=db.qard.loans.find(l=>l.id===loanId); if(!loan) return;
+  loan.repayments=(loan.repayments||[]).filter(p=>p.id!==repId);
+  await saveDB(); toast('✅ تم حذف الدفعة','success'); renderQardPage();
+}
+
+function openEditQardRepay(loanId, repId){
+  initQard();
+  const loan=db.qard.loans.find(l=>l.id===loanId); if(!loan) return;
+  const rep=(loan.repayments||[]).find(p=>p.id===repId); if(!rep) return;
+  document.getElementById('qard-edit-repay-loan-id').value=loanId;
+  document.getElementById('qard-edit-repay-id').value=repId;
+  document.getElementById('qard-edit-repay-amount').value=rep.amount;
+  document.getElementById('qard-edit-repay-date').value=rep.date;
+  document.getElementById('qard-edit-repay-notes').value=rep.notes||'';
+  const otherRepaid=(loan.repayments||[]).filter(p=>p.id!==repId).reduce((s,p)=>s+p.amount,0);
+  const maxAllowed=loan.amount-otherRepaid;
+  document.getElementById('qard-edit-repay-info').innerHTML=
+    `<strong>${loan.name}</strong><br>القرض: ${loan.amount.toLocaleString('ar-EG')} ج &nbsp;|&nbsp;
+     أقصى مبلغ مسموح لهذه الدفعة: <span style="color:var(--danger);font-weight:700;">${maxAllowed.toLocaleString('ar-EG')} ج</span>`;
+  document.getElementById('qard-edit-repay-modal').classList.add('open');
+}
+
+async function saveEditQardRepay(){
+  initQard();
+  const loanId=parseInt(document.getElementById('qard-edit-repay-loan-id').value);
+  const repId=parseInt(document.getElementById('qard-edit-repay-id').value);
+  const amount=parseFloat(document.getElementById('qard-edit-repay-amount').value);
+  const date=document.getElementById('qard-edit-repay-date').value;
+  const notes=document.getElementById('qard-edit-repay-notes').value.trim();
+  if(!amount||amount<=0) return toast('⚠️ أدخل المبلغ','error');
+  if(!date) return toast('⚠️ أدخل التاريخ','error');
+  const loan=db.qard.loans.find(l=>l.id===loanId); if(!loan) return toast('⚠️ لم يُعثر على القرض','error');
+  const rep=(loan.repayments||[]).find(p=>p.id===repId); if(!rep) return toast('⚠️ لم يُعثر على الدفعة','error');
+  const otherRepaid=(loan.repayments||[]).filter(p=>p.id!==repId).reduce((s,p)=>s+p.amount,0);
+  const maxAllowed=loan.amount-otherRepaid;
+  if(amount>maxAllowed) return toast('⚠️ المبلغ ('+amount.toLocaleString('ar-EG')+' ج) أكبر من المسموح لهذه الدفعة ('+maxAllowed.toLocaleString('ar-EG')+' ج)','error');
+  rep.amount=amount; rep.date=date; rep.notes=notes;
+  await saveDB(); closeModal('qard-edit-repay-modal');
+  toast('✅ تم حفظ التعديل','success'); renderQardPage();
+}
+
+function renderRepList(loan){
+  return (loan.repayments||[]).map(p=>
+    `<small style="display:flex;align-items:center;gap:6px;color:#5a7a5a;margin-top:2px;">
+      <span>↩ ${p.amount.toLocaleString('ar-EG')} ج (${formatDate(p.date)})${p.notes?' — '+p.notes:''}</span>
+      <button class="btn btn-outline btn-sm" style="padding:1px 5px;font-size:10px;" onclick="event.stopPropagation();openEditQardRepay(${loan.id},${p.id})">✏️</button>
+      <button class="btn btn-outline btn-sm" style="padding:1px 5px;font-size:10px;" onclick="event.stopPropagation();deleteQardRepayment(${loan.id},${p.id})">🗑️</button>
+    </small>`
+  ).join('');
+}
+
 function renderQardPage() {
   initQard();
   const today=new Date().toISOString().split('T')[0];
@@ -2038,9 +2109,7 @@ function renderQardPage() {
         const repaid=(loan.repayments||[]).reduce((s,p)=>s+p.amount,0);
         const remaining=loan.amount-repaid;
         const pct=loan.amount>0?Math.round(repaid/loan.amount*100):0;
-        const repList=(loan.repayments||[]).map(p=>
-          `<small style="display:block;color:#5a7a5a;">↩ ${p.amount.toLocaleString('ar-EG')} ج (${formatDate(p.date)})${p.notes?' — '+p.notes:''}</small>`
-        ).join('');
+        const repList=renderRepList(loan);
         return `<tr>
           <td><strong>${loan.name}</strong><br><small style="color:#777;">${formatDate(loan.date)}</small></td>
           <td class="balance-neg">${loan.amount.toLocaleString('ar-EG')} ج</td>
@@ -2063,9 +2132,7 @@ function renderQardPage() {
     } else {
       loansDoneBody.innerHTML=doneLoans.map(loan=>{
         const repaid=(loan.repayments||[]).reduce((s,p)=>s+p.amount,0);
-        const repList=(loan.repayments||[]).map(p=>
-          `<small style="display:block;color:#5a7a5a;">↩ ${p.amount.toLocaleString('ar-EG')} ج (${formatDate(p.date)})${p.notes?' — '+p.notes:''}</small>`
-        ).join('');
+        const repList=renderRepList(loan);
         return `<tr style="opacity:0.7;">
           <td><strong>${loan.name}</strong><br><small style="color:#777;">${formatDate(loan.date)}</small></td>
           <td class="balance-neg">${loan.amount.toLocaleString('ar-EG')} ج</td>
