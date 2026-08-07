@@ -232,8 +232,8 @@
       <div class="card">
         <div class="card-title">💸 تسجيل مصروف</div>
         <div class="form-grid">
-          <div class="form-group"><label>البيان *</label><input type="text" id="exp-desc" placeholder="وصف المصروف"></div>
-          <div class="form-group"><label>🏠 المستفيد (اختياري)</label><select id="exp-beneficiary" style="padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-family:Cairo,sans-serif;font-size:14px;width:100%;"><option value="">-- بدون مستفيد --</option></select></div>
+          <div class="form-group"><label>البيان <span id="exp-desc-required" style="color:var(--danger);">*</span></label><input type="text" id="exp-desc" placeholder="وصف المصروف (اختياري عند اختيار مستفيد)"></div>
+          <div class="form-group"><label>🏠 المستفيد (اختياري)</label><select id="exp-beneficiary" onchange="toggleExpDescRequired()" style="padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-family:Cairo,sans-serif;font-size:14px;width:100%;"><option value="">-- بدون مستفيد --</option></select></div>
           <div class="form-group"><label>المبلغ (جنيه) *</label><input type="number" id="exp-amount" placeholder="0.00" min="1"></div>
           <div class="form-group"><label>التاريخ *</label><input type="date" id="exp-date"></div>
           <div class="form-group"><label>ملاحظات</label><input type="text" id="exp-notes" placeholder="ملاحظات اختيارية"></div>
@@ -864,7 +864,21 @@ function toast(msg, type='') {
 }
 function formatDate(d){if(!d)return'-';const p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
 function getGenderLabel(g) { if(g==='M') return 'الأستاذ'; if(g==='F') return 'الأستاذة'; if(g==='C') return 'جهة/شركة'; return 'الأستاذ(ة)'; }
-function getPrivacyDesc(t) { if(t.type === 'expense' || t.donorId === 'general') return t.desc; const d = db.donors.find(x=>x.id === t.donorId); if(d) return `مساهمة ◀ كود: ${d.code}`; return t.desc; }
+function getPrivacyDesc(t) {
+  if(t.type === 'expense') {
+    if(t.beneficiaryId) {
+      const benLabel = getBenLabel(t.beneficiaryId);
+      if(benLabel) {
+        return t.desc ? `${t.desc} — ${benLabel}` : benLabel;
+      }
+    }
+    return t.desc;
+  }
+  if(t.donorId === 'general') return t.desc;
+  const d = db.donors.find(x=>x.id === t.donorId);
+  if(d) return `مساهمة ◀ كود: ${d.code}`;
+  return t.desc;
+}
 
 // ==========================================
 // 5. المتبرعون ومربع البحث والتذكير الذكي
@@ -1087,12 +1101,23 @@ async function saveDonation(){
   }
 }
 
+function toggleExpDescRequired(){
+  const benSelected = !!document.getElementById('exp-beneficiary').value;
+  const star = document.getElementById('exp-desc-required');
+  if(star) star.style.display = benSelected ? 'none' : 'inline';
+}
+
 async function saveExpense(){
   if(!selectedProject) return toast('⚠️ اختر مشروعاً','error');
   const desc=document.getElementById('exp-desc').value.trim(), amount=parseFloat(document.getElementById('exp-amount').value), date=document.getElementById('exp-date').value, notes=document.getElementById('exp-notes').value.trim();
-  if(!desc||!amount||amount<=0) return toast('⚠️ أكمل البيانات','error');
-  db.transactions.push({id:Date.now(), type:'expense', projectId:selectedProject.id, amount, date, notes, desc}); await saveDB();
-  document.getElementById('exp-desc').value=''; document.getElementById('exp-amount').value=''; document.getElementById('exp-notes').value=''; toast('✅ تم تسجيل المصروف','success');
+  const benVal=document.getElementById('exp-beneficiary').value;
+  const beneficiaryId = benVal ? parseInt(benVal) : null;
+  if(!beneficiaryId && !desc) return toast('⚠️ أدخل البيان أو اختر مستفيداً','error');
+  if(!amount||amount<=0) return toast('⚠️ أكمل البيانات','error');
+  db.transactions.push({id:Date.now(), type:'expense', projectId:selectedProject.id, amount, date, notes, desc, beneficiaryId}); await saveDB();
+  document.getElementById('exp-desc').value=''; document.getElementById('exp-amount').value=''; document.getElementById('exp-notes').value='';
+  document.getElementById('exp-beneficiary').value=''; toggleExpDescRequired();
+  toast('✅ تم تسجيل المصروف','success');
 }
 
 function openEditTx(id) {
@@ -1115,7 +1140,7 @@ async function saveEditTx() {
       const dId = document.getElementById('edit-tx-donor').value; if(!dId) return toast('⚠️ اختر المتبرع', 'error'); 
       if(dId === 'general') { const desc = document.getElementById('edit-tx-desc').value.trim(); if(!desc) return toast('⚠️ أدخل البيان', 'error'); tx.donorId = 'general'; tx.desc = desc; } 
       else { tx.donorId = parseInt(dId); tx.desc = 'مساهمة'; }
-  } else { const desc = document.getElementById('edit-tx-desc').value.trim(); if(!desc) return toast('⚠️ أدخل البيان', 'error'); tx.desc = desc; }
+  } else { const desc = document.getElementById('edit-tx-desc').value.trim(); if(!desc && !tx.beneficiaryId) return toast('⚠️ أدخل البيان', 'error'); tx.desc = desc; }
   await saveDB(); closeModal('edit-tx-modal'); toast('✅ تم تعديل الحركة', 'success');
 }
 
