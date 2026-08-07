@@ -526,12 +526,19 @@
 <div class="img-modal-overlay" id="img-modal">
   <div class="img-modal" style="max-width: 800px; width: 95%;">
     <div class="modal-title">🖼️ التقرير جاهز — يمكنك مشاركته للجروب</div>
+    <div id="report-page-nav" style="display:none; align-items:center; justify-content:center; gap:14px; margin-bottom:-4px;">
+      <button id="report-prev-btn" class="btn btn-outline btn-sm" onclick="prevReportPage()">◀ السابقة</button>
+      <span id="report-page-label" style="font-weight:bold; color:#1a5c38;"></span>
+      <button id="report-next-btn" class="btn btn-outline btn-sm" onclick="nextReportPage()">التالية ▶</button>
+    </div>
     <div style="overflow-y: auto; max-height: 60vh; background: #e8ece8; padding: 10px; border-radius: 10px; text-align: center;">
         <img id="img-preview" src="" alt="تقرير" style="max-width: 100%; height: auto;">
     </div>
-    <div class="modal-actions" style="margin-top:20px; justify-content: center;">
-      <button class="btn btn-success" onclick="shareImageToWhatsApp()">📲 مشاركة واتساب / جروب</button>
-      <button class="btn btn-primary" onclick="downloadImage()">⬇️ حفظ بالهاتف</button>
+    <div class="modal-actions" style="margin-top:20px; justify-content: center; flex-wrap:wrap;">
+      <button class="btn btn-success" onclick="shareImageToWhatsApp()">📲 مشاركة الصفحة الحالية</button>
+      <button class="btn btn-primary" onclick="downloadImage()">⬇️ حفظ الصفحة الحالية</button>
+      <button id="report-share-all-btn" class="btn btn-success" style="display:none;" onclick="shareAllReportPagesToWhatsApp()">📲 مشاركة كل الصفحات</button>
+      <button id="report-download-all-btn" class="btn btn-primary" style="display:none;" onclick="downloadAllReportPages()">⬇️ حفظ كل الصفحات</button>
       <button class="btn btn-outline" onclick="closeImgModal()">إغلاق</button>
     </div>
   </div>
@@ -559,6 +566,71 @@ const WA_GROUP_LINK = 'https://chat.whatsapp.com/KQxUlARMPbWCdjFn6d3XKC';
 let db = { donors:[], projects:[], transactions:[], cases:[], beneficiaries:[], qard:{deposits:[],loans:[]} };
 let selectedProject = null, currentWaPhone = '', currentWaMessage = '', currentDownloadName = 'تقرير.png';
 let fbInitialized = false;
+
+// ============================================================
+// 📄 نظام الصفحات المتعددة للتقارير الطويلة (multi-page reports)
+// ============================================================
+let currentReportImages = []; // [{url,name}]
+let currentReportIndex = 0;
+
+function openReportModal(images){
+  // images: array of {url:dataURL, name:filename} — أو مصفوفة فاضية = لا شيء
+  if(!images || !images.length) return;
+  currentReportImages = images;
+  currentReportIndex = 0;
+  renderReportPage();
+  document.getElementById('img-modal').classList.add('open');
+}
+
+function renderReportPage(){
+  if(!currentReportImages.length) return;
+  const img = document.getElementById('img-preview');
+  img.src = currentReportImages[currentReportIndex].url;
+  currentDownloadName = currentReportImages[currentReportIndex].name;
+  const nav = document.getElementById('report-page-nav');
+  if(nav){
+    const multi = currentReportImages.length > 1;
+    if(multi){
+      nav.style.display = 'flex';
+      document.getElementById('report-page-label').textContent = `صفحة ${currentReportIndex+1} من ${currentReportImages.length}`;
+      document.getElementById('report-prev-btn').disabled = currentReportIndex===0;
+      document.getElementById('report-next-btn').disabled = currentReportIndex===currentReportImages.length-1;
+    } else {
+      nav.style.display = 'none';
+    }
+    document.getElementById('report-share-all-btn').style.display = multi ? 'inline-block' : 'none';
+    document.getElementById('report-download-all-btn').style.display = multi ? 'inline-block' : 'none';
+  }
+}
+
+function prevReportPage(){ if(currentReportIndex>0){ currentReportIndex--; renderReportPage(); } }
+function nextReportPage(){ if(currentReportIndex<currentReportImages.length-1){ currentReportIndex++; renderReportPage(); } }
+
+async function downloadAllReportPages(){
+  if(currentReportImages.length<=1) return downloadImage();
+  for(const item of currentReportImages){
+    const link=document.createElement('a'); link.download=item.name; link.href=item.url; link.click();
+    await new Promise(r=>setTimeout(r,300)); // مهلة بسيطة بين كل تحميل وتاني
+  }
+  toast('✅ تم تحميل كل الصفحات ('+currentReportImages.length+')','success');
+}
+
+async function shareAllReportPagesToWhatsApp(){
+  if(currentReportImages.length<=1) return shareImageToWhatsApp();
+  try{
+    const files = await Promise.all(currentReportImages.map(async (item,i)=>{
+      const blob = await (await fetch(item.url)).blob();
+      return new File([blob], item.name, {type:'image/png'});
+    }));
+    if(navigator.canShare && navigator.canShare({files})){
+      await navigator.share({files});
+      toast('✅ تمت مشاركة كل الصفحات بنجاح','success');
+      closeImgModal();
+    } else {
+      toast('⚠️ متصفحك لا يدعم مشاركة عدة صور دفعة واحدة، شارك كل صفحة لوحدها','error');
+    }
+  } catch(err){ if(err.name!=='AbortError') toast('⚠️ تعذرت مشاركة كل الصفحات','error'); }
+}
 
 // تحميل البيانات المحلية فوراً
 (function(){
@@ -728,7 +800,7 @@ function switchTab(tabId, el) {
   if(tabId==='tab-statement') renderStatement(); if(tabId==='tab-donation') populateDonorSelect('don-donor');
 }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-function closeImgModal() { document.getElementById('img-modal').classList.remove('open'); }
+function closeImgModal() { document.getElementById('img-modal').classList.remove('open'); currentReportImages=[]; currentReportIndex=0; }
 function toast(msg, type='') {
   const t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast show' + (type ? ' '+type : ''); setTimeout(() => t.classList.remove('show'), 3000);
 }
@@ -1152,7 +1224,7 @@ function exportStatementImage(){
   }
   ctx.textAlign='center'; ctx.fillStyle='#88a888'; ctx.font='bold 18px Cairo,Arial'; ctx.fillText('تم استخراج هذا التقرير آلياً بواسطة نظام إدارة التبرعات 🌿', W/2, H - 40);
   
-  const img=document.getElementById('img-preview'); img.src=cvs.toDataURL('image/png'); currentDownloadName = 'كشف_حساب_'+selectedProject.name+'.png'; document.getElementById('img-modal').classList.add('open');
+  openReportModal([{url: cvs.toDataURL('image/png'), name: 'كشف_حساب_'+selectedProject.name+'.png'}]);
 }
 
 function exportActiveProjectsImage() {
@@ -1177,7 +1249,7 @@ function exportActiveProjectsImage() {
   ctx.textAlign='right'; ctx.fillStyle='#0f3d25'; ctx.font='bold 28px Cairo,Arial'; ctx.fillText('إجمالي أرصدة المشاريع الفعالة:', W - MARGIN - 30, startY + 70);
   ctx.textAlign='left'; ctx.fillStyle= totalBalances >= 0 ? '#1a5c38' : '#c0392b'; ctx.font='bold 34px Cairo,Arial'; ctx.fillText(totalBalances.toLocaleString('ar-EG') + ' ج', MARGIN + 30, startY + 72);
   
-  const img=document.getElementById('img-preview'); img.src=cvs.toDataURL('image/png'); currentDownloadName = 'تقرير_المشاريع_الفعالة.png'; document.getElementById('img-modal').classList.add('open');
+  openReportModal([{url: cvs.toDataURL('image/png'), name: 'تقرير_المشاريع_الفعالة.png'}]);
 }
 
 // ----------------------------------------------------
@@ -1223,6 +1295,15 @@ function generateSixMonthsReport() {
   if(!totalRows) return toast('⚠️ لا توجد مساهمات شخصية في آخر 6 شهور','error');
 
   // ============================================================
+  // 📄 تقسيم لصفحات — 25 مساهم لكل صورة، لتفادي فقد الجودة
+  // في الصور الطويلة جداً (ضغط واتساب التلقائي للصور الطويلة)
+  // ============================================================
+  const PAGE_SIZE = 25;
+  const pages = [];
+  for(let i=0;i<sorted.length;i+=PAGE_SIZE) pages.push(sorted.slice(i,i+PAGE_SIZE));
+  const numPages = pages.length;
+
+  // ============================================================
   // أبعاد الكانفاس
   // ============================================================
   const DPR=2;
@@ -1236,25 +1317,8 @@ function generateSixMonthsReport() {
   const TH_H    = 52;
   const ROW_H   = 52;
   const FOOT_H  = 52;
-  const SUM_H   = 44 * last6.filter(x=>monthly[x.key].in>0||monthly[x.key].out>0).length + 70;
-  const H = HDR_H + TH_H + (totalRows*ROW_H) + ROW_H + SUM_H + FOOT_H + 20;
-
-  const cvs=document.getElementById('export-canvas');
-  cvs.width=W*DPR; cvs.height=H*DPR;
-  const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
-
-  // خلفية
-  ctx.fillStyle='#f2f7f3'; ctx.fillRect(0,0,W,H);
-
-  // هيدر
-  const gH=ctx.createLinearGradient(0,0,W,HDR_H);
-  gH.addColorStop(0,'#0a2e1a'); gH.addColorStop(1,'#2d8a56');
-  ctx.fillStyle=gH; ctx.fillRect(0,0,W,HDR_H);
-  ctx.font='38px Arial'; ctx.textAlign='center'; ctx.fillText('📊',55,HDR_H/2+14);
-  ctx.fillStyle='white'; ctx.font='bold 42px Cairo,Arial';
-  ctx.fillText('حصاد مساهمات آخر 6 شهور',W/2,HDR_H/2-8);
-  ctx.fillStyle='#ffd166'; ctx.font='bold 20px Cairo,Arial';
-  ctx.fillText('الوارد والمصروفات والصافي — الأكواد فقط',W/2,HDR_H/2+34);
+  const activeMonths=last6.filter(x=>monthly[x.key].in>0||monthly[x.key].out>0);
+  const SUM_H   = 44 * activeMonths.length + 70;
 
   // ============================================================
   // دالة مساعدة: حساب X مركز كل عمود (RTL — الكود على اليمين)
@@ -1269,133 +1333,175 @@ function generateSixMonthsReport() {
   });
   colCX.total = MARGIN + COL_TOTAL/2;
 
-  // ============================================================
-  // رأس الجدول
-  // ============================================================
-  let curY = HDR_H;
-  const gTH=ctx.createLinearGradient(0,curY,0,curY+TH_H);
-  gTH.addColorStop(0,'#1a5c38'); gTH.addColorStop(1,'#0f3d25');
-  ctx.fillStyle=gTH; ctx.fillRect(MARGIN,curY,W-MARGIN*2,TH_H);
+  const cvs=document.getElementById('export-canvas');
+  const images=[];
 
-  ctx.fillStyle='white'; ctx.font='bold 19px Cairo,Arial'; ctx.textAlign='center';
-  ctx.fillText('الكود',colCX.code,curY+TH_H/2+7);
-  last6.forEach((m,i)=> ctx.fillText(m.label,colCX['m'+i],curY+TH_H/2+7));
-  ctx.fillStyle='#ffd166'; ctx.font='bold 19px Cairo,Arial';
-  ctx.fillText('الإجمالي',colCX.total,curY+TH_H/2+7);
+  pages.forEach((pageIds,pageIdx)=>{
+    const isLastPage = pageIdx===numPages-1;
+    const H = HDR_H + TH_H + (pageIds.length*ROW_H) + (isLastPage?(ROW_H+16+SUM_H+12):0) + FOOT_H + 20;
 
-  // خطوط فاصلة عمودية في الهيدر
-  ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1;
-  [colCX.code-COL_CODE/2, ...last6.map((_,i)=>colCX['m'+i]-COL_MONTH/2), colCX.total-COL_TOTAL/2].forEach(x=>{
-    ctx.beginPath(); ctx.moveTo(x,curY+6); ctx.lineTo(x,curY+TH_H-6); ctx.stroke();
-  });
+    cvs.width=W*DPR; cvs.height=H*DPR;
+    const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
 
-  curY += TH_H;
+    // خلفية
+    ctx.fillStyle='#f2f7f3'; ctx.fillRect(0,0,W,H);
 
-  // ============================================================
-  // صفوف البيانات
-  // ============================================================
-  sorted.forEach((dId,idx)=>{
-    const donor=db.donors.find(d=>String(d.id)===String(dId));
-    const label=donor?donor.code:'???';
-    const stat=dStats[dId];
+    // هيدر
+    const gH=ctx.createLinearGradient(0,0,W,HDR_H);
+    gH.addColorStop(0,'#0a2e1a'); gH.addColorStop(1,'#2d8a56');
+    ctx.fillStyle=gH; ctx.fillRect(0,0,W,HDR_H);
+    ctx.font='38px Arial'; ctx.textAlign='center'; ctx.fillText('📊',55,HDR_H/2+14);
+    ctx.fillStyle='white'; ctx.font='bold 42px Cairo,Arial';
+    ctx.fillText('حصاد مساهمات آخر 6 شهور',W/2,HDR_H/2-8);
+    ctx.fillStyle='#ffd166'; ctx.font='bold 20px Cairo,Arial';
+    const subtitle = numPages>1
+      ? `الوارد والمصروفات والصافي — الأكواد فقط  •  صفحة ${pageIdx+1} من ${numPages}`
+      : 'الوارد والمصروفات والصافي — الأكواد فقط';
+    ctx.fillText(subtitle,W/2,HDR_H/2+34);
 
-    // خلفية الصف
-    ctx.fillStyle=idx%2===0?'#ffffff':'#eef6f0';
-    ctx.fillRect(MARGIN,curY,W-MARGIN*2,ROW_H);
+    // ============================================================
+    // رأس الجدول
+    // ============================================================
+    let curY = HDR_H;
+    const gTH=ctx.createLinearGradient(0,curY,0,curY+TH_H);
+    gTH.addColorStop(0,'#1a5c38'); gTH.addColorStop(1,'#0f3d25');
+    ctx.fillStyle=gTH; ctx.fillRect(MARGIN,curY,W-MARGIN*2,TH_H);
 
-    // فاصل أسفل الصف
-    ctx.strokeStyle='#d4e8d4'; ctx.lineWidth=0.7;
-    ctx.beginPath(); ctx.moveTo(MARGIN,curY+ROW_H); ctx.lineTo(W-MARGIN,curY+ROW_H); ctx.stroke();
+    ctx.fillStyle='white'; ctx.font='bold 19px Cairo,Arial'; ctx.textAlign='center';
+    ctx.fillText('الكود',colCX.code,curY+TH_H/2+7);
+    last6.forEach((m,i)=> ctx.fillText(m.label,colCX['m'+i],curY+TH_H/2+7));
+    ctx.fillStyle='#ffd166'; ctx.font='bold 19px Cairo,Arial';
+    ctx.fillText('الإجمالي',colCX.total,curY+TH_H/2+7);
 
-    // الكود
-    ctx.fillStyle='#0f3d25'; ctx.font='bold 19px Cairo,Arial'; ctx.textAlign='center';
-    ctx.fillText(label,colCX.code,curY+ROW_H/2+7);
-
-    // قيم الأشهر
-    last6.forEach((m,i)=>{
-      const val=stat[m.key]||0;
-      if(val>0){
-        ctx.fillStyle='#1a5c38'; ctx.font='bold 18px Cairo,Arial';
-        ctx.fillText(val.toLocaleString('ar-EG'),colCX['m'+i],curY+ROW_H/2+7);
-      } else {
-        ctx.fillStyle='#c0c8c0'; ctx.font='18px Cairo,Arial';
-        ctx.fillText('—',colCX['m'+i],curY+ROW_H/2+7);
-      }
+    // خطوط فاصلة عمودية في الهيدر
+    ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1;
+    [colCX.code-COL_CODE/2, ...last6.map((_,i)=>colCX['m'+i]-COL_MONTH/2), colCX.total-COL_TOTAL/2].forEach(x=>{
+      ctx.beginPath(); ctx.moveTo(x,curY+6); ctx.lineTo(x,curY+TH_H-6); ctx.stroke();
     });
 
-    // الإجمالي
-    ctx.fillStyle='#0f3d25'; ctx.font='bold 20px Cairo,Arial';
-    ctx.fillText(stat.total.toLocaleString('ar-EG'),colCX.total,curY+ROW_H/2+7);
+    curY += TH_H;
 
-    // فواصل عمودية
-    ctx.strokeStyle='#e0eee0'; ctx.lineWidth=0.5;
-    [colCX.code-COL_CODE/2,...last6.map((_,i)=>colCX['m'+i]-COL_MONTH/2),colCX.total-COL_TOTAL/2].forEach(x=>{
-      ctx.beginPath(); ctx.moveTo(x,curY+4); ctx.lineTo(x,curY+ROW_H-4); ctx.stroke();
+    // ============================================================
+    // صفوف البيانات (صفحة حالية فقط)
+    // ============================================================
+    pageIds.forEach((dId,idx)=>{
+      const donor=db.donors.find(d=>String(d.id)===String(dId));
+      const label=donor?donor.code:'???';
+      const stat=dStats[dId];
+
+      // خلفية الصف
+      ctx.fillStyle=idx%2===0?'#ffffff':'#eef6f0';
+      ctx.fillRect(MARGIN,curY,W-MARGIN*2,ROW_H);
+
+      // فاصل أسفل الصف
+      ctx.strokeStyle='#d4e8d4'; ctx.lineWidth=0.7;
+      ctx.beginPath(); ctx.moveTo(MARGIN,curY+ROW_H); ctx.lineTo(W-MARGIN,curY+ROW_H); ctx.stroke();
+
+      // الكود
+      ctx.fillStyle='#0f3d25'; ctx.font='bold 19px Cairo,Arial'; ctx.textAlign='center';
+      ctx.fillText(label,colCX.code,curY+ROW_H/2+7);
+
+      // قيم الأشهر
+      last6.forEach((m,i)=>{
+        const val=stat[m.key]||0;
+        if(val>0){
+          ctx.fillStyle='#1a5c38'; ctx.font='bold 18px Cairo,Arial';
+          ctx.fillText(val.toLocaleString('ar-EG'),colCX['m'+i],curY+ROW_H/2+7);
+        } else {
+          ctx.fillStyle='#c0c8c0'; ctx.font='18px Cairo,Arial';
+          ctx.fillText('—',colCX['m'+i],curY+ROW_H/2+7);
+        }
+      });
+
+      // الإجمالي
+      ctx.fillStyle='#0f3d25'; ctx.font='bold 20px Cairo,Arial';
+      ctx.fillText(stat.total.toLocaleString('ar-EG'),colCX.total,curY+ROW_H/2+7);
+
+      // فواصل عمودية
+      ctx.strokeStyle='#e0eee0'; ctx.lineWidth=0.5;
+      [colCX.code-COL_CODE/2,...last6.map((_,i)=>colCX['m'+i]-COL_MONTH/2),colCX.total-COL_TOTAL/2].forEach(x=>{
+        ctx.beginPath(); ctx.moveTo(x,curY+4); ctx.lineTo(x,curY+ROW_H-4); ctx.stroke();
+      });
+
+      curY+=ROW_H;
     });
 
-    curY+=ROW_H;
+    // ============================================================
+    // صف الإجمالي الشهري + ملخص الشهور — يظهروا في آخر صفحة فقط
+    // ============================================================
+    if(isLastPage){
+      ctx.fillStyle='#1a5c38'; ctx.fillRect(MARGIN,curY,W-MARGIN*2,ROW_H);
+      ctx.fillStyle='white'; ctx.font='bold 19px Cairo,Arial'; ctx.textAlign='center';
+      ctx.fillText('إجمالي الوارد',colCX.code,curY+ROW_H/2+7);
+      let grandTotal=0;
+      last6.forEach((m,i)=>{
+        const v=monthly[m.key].in;
+        grandTotal+=v;
+        ctx.fillStyle=v>0?'#ffd166':'rgba(255,255,255,0.4)';
+        ctx.font=v>0?'bold 19px Cairo,Arial':'18px Cairo,Arial';
+        ctx.fillText(v>0?v.toLocaleString('ar-EG'):'—',colCX['m'+i],curY+ROW_H/2+7);
+      });
+      ctx.fillStyle='#ffd166'; ctx.font='bold 22px Cairo,Arial';
+      ctx.fillText(grandTotal.toLocaleString('ar-EG'),colCX.total,curY+ROW_H/2+7);
+      curY+=ROW_H+16;
+
+      const gSum=ctx.createLinearGradient(MARGIN,curY,W-MARGIN,curY);
+      gSum.addColorStop(0,'#0a2e1a'); gSum.addColorStop(1,'#1a5c38');
+      ctx.fillStyle=gSum;
+      roundRect(ctx,MARGIN,curY,W-MARGIN*2,SUM_H,14); ctx.fill();
+
+      ctx.fillStyle='white'; ctx.textAlign='center'; ctx.font='bold 22px Cairo,Arial';
+      ctx.fillText('📝 ملخص الشهور الفعالة',W/2,curY+38);
+      ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(MARGIN+20,curY+48); ctx.lineTo(W-MARGIN-20,curY+48); ctx.stroke();
+
+      let sY=curY+56;
+      activeMonths.forEach(m=>{
+        const cIn=monthly[m.key].in, cOut=monthly[m.key].out;
+        const net=cIn-cOut, cnt=monthly[m.key].donors.size;
+        ctx.font='bold 18px Cairo,Arial'; ctx.textAlign='right';
+        ctx.fillStyle=net>=0?'#a8e6c0':'#f5a8a8';
+        const line=`🗓️ ${m.label}   مساهمون: ${cnt}   وارد: ${cIn.toLocaleString('ar-EG')} ج   صادر: ${cOut.toLocaleString('ar-EG')} ج   صافي: ${net.toLocaleString('ar-EG')} ج`;
+        ctx.fillText(line,W-MARGIN-16,sY);
+        sY+=44;
+      });
+      curY+=SUM_H+12;
+    }
+
+    // فوتر
+    ctx.fillStyle='#7a9a7a'; ctx.font='bold 17px Cairo,Arial'; ctx.textAlign='center';
+    ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿  —  جزاكم الله خيراً',W/2,curY+30);
+
+    const pageName = numPages>1 ? `تقرير_حصاد_6شهور_صفحة${pageIdx+1}.png` : 'تقرير_حصاد_6شهور.png';
+    images.push({url: cvs.toDataURL('image/png'), name: pageName});
   });
 
-  // ============================================================
-  // صف الإجمالي الشهري
-  // ============================================================
-  ctx.fillStyle='#1a5c38'; ctx.fillRect(MARGIN,curY,W-MARGIN*2,ROW_H);
-  ctx.fillStyle='white'; ctx.font='bold 19px Cairo,Arial'; ctx.textAlign='center';
-  ctx.fillText('إجمالي الوارد',colCX.code,curY+ROW_H/2+7);
-  let grandTotal=0;
-  last6.forEach((m,i)=>{
-    const v=monthly[m.key].in;
-    grandTotal+=v;
-    ctx.fillStyle=v>0?'#ffd166':'rgba(255,255,255,0.4)';
-    ctx.font=v>0?'bold 19px Cairo,Arial':'18px Cairo,Arial';
-    ctx.fillText(v>0?v.toLocaleString('ar-EG'):'—',colCX['m'+i],curY+ROW_H/2+7);
-  });
-  ctx.fillStyle='#ffd166'; ctx.font='bold 22px Cairo,Arial';
-  ctx.fillText(grandTotal.toLocaleString('ar-EG'),colCX.total,curY+ROW_H/2+7);
-  curY+=ROW_H+16;
-
-  // ============================================================
-  // ملخص الشهور
-  // ============================================================
-  const activeMonths=last6.filter(x=>monthly[x.key].in>0||monthly[x.key].out>0);
-  const gSum=ctx.createLinearGradient(MARGIN,curY,W-MARGIN,curY);
-  gSum.addColorStop(0,'#0a2e1a'); gSum.addColorStop(1,'#1a5c38');
-  ctx.fillStyle=gSum;
-  roundRect(ctx,MARGIN,curY,W-MARGIN*2,SUM_H,14); ctx.fill();
-
-  ctx.fillStyle='white'; ctx.textAlign='center'; ctx.font='bold 22px Cairo,Arial';
-  ctx.fillText('📝 ملخص الشهور الفعالة',W/2,curY+38);
-  ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(MARGIN+20,curY+48); ctx.lineTo(W-MARGIN-20,curY+48); ctx.stroke();
-
-  let sY=curY+56;
-  activeMonths.forEach(m=>{
-    const cIn=monthly[m.key].in, cOut=monthly[m.key].out;
-    const net=cIn-cOut, cnt=monthly[m.key].donors.size;
-    ctx.font='bold 18px Cairo,Arial'; ctx.textAlign='right';
-    ctx.fillStyle=net>=0?'#a8e6c0':'#f5a8a8';
-    const line=`🗓️ ${m.label}   مساهمون: ${cnt}   وارد: ${cIn.toLocaleString('ar-EG')} ج   صادر: ${cOut.toLocaleString('ar-EG')} ج   صافي: ${net.toLocaleString('ar-EG')} ج`;
-    ctx.fillText(line,W-MARGIN-16,sY);
-    sY+=44;
-  });
-  curY+=SUM_H+12;
-
-  // فوتر
-  ctx.fillStyle='#7a9a7a'; ctx.font='bold 17px Cairo,Arial'; ctx.textAlign='center';
-  ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿  —  جزاكم الله خيراً',W/2,curY+30);
-
-  const img=document.getElementById('img-preview');
-  img.src=cvs.toDataURL('image/png');
-  currentDownloadName='تقرير_حصاد_6شهور.png';
-  document.getElementById('img-modal').classList.add('open');
+  openReportModal(images);
 }
 
 
 function downloadImage(){
+  // لو التقرير الحالي متعدد الصفحات، حمّل الصفحة المعروضة حاليًا من مصفوفة الصفحات
+  if(currentReportImages.length){
+    const item=currentReportImages[currentReportIndex];
+    const link=document.createElement('a'); link.download=item.name; link.href=item.url; link.click();
+    return;
+  }
   const cvs=document.getElementById('export-canvas'); const link=document.createElement('a'); link.download=currentDownloadName; link.href=cvs.toDataURL('image/png'); link.click();
 }
 
 async function shareImageToWhatsApp() {
+  // لو التقرير الحالي متعدد الصفحات، شارك الصفحة المعروضة حاليًا فقط
+  if(currentReportImages.length){
+    try{
+      const blob = await (await fetch(currentReportImages[currentReportIndex].url)).blob();
+      const file = new File([blob], currentReportImages[currentReportIndex].name, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file] }); toast('✅ تمت المشاركة بنجاح', 'success'); closeImgModal();
+      } else { toast('⚠️ متصفحك لا يدعم المشاركة المباشرة للصور', 'error'); }
+    } catch(err){ if(err.name !== 'AbortError') toast('⚠️ تعذرت المشاركة', 'error'); }
+    return;
+  }
   const cvs = document.getElementById('export-canvas');
   cvs.toBlob(async (blob) => {
     const file = new File([blob], currentDownloadName, { type: 'image/png' });
@@ -1517,10 +1623,7 @@ function generateTopDonorsReport() {
   ctx.fillStyle='#5a7a5a'; ctx.font='bold 19px Cairo,Arial'; ctx.textAlign='center';
   ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿  —  جزاكم الله خيراً',W/2,y+4+FTR/2+7);
 
-  const img=document.getElementById('img-preview');
-  img.src=cvs.toDataURL('image/png');
-  currentDownloadName='تقرير_أبطال_التبرع.png';
-  document.getElementById('img-modal').classList.add('open');
+  openReportModal([{url: cvs.toDataURL('image/png'), name: 'تقرير_أبطال_التبرع.png'}]);
 }
 
 function openDonorCardSearch() {
@@ -1661,10 +1764,7 @@ function drawDonorCard(donorId) {
   ctx.fillStyle='#5a7a5a'; ctx.font='bold 15px Cairo,Arial'; ctx.textAlign='center';
   ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿  —  جزاكم الله خيراً',W/2,H-36);
 
-  const img=document.getElementById('img-preview');
-  img.src=cvs.toDataURL('image/png');
-  currentDownloadName='بطاقة_مساهم_'+donor.name+'.png';
-  document.getElementById('img-modal').classList.add('open');
+  openReportModal([{url: cvs.toDataURL('image/png'), name: 'بطاقة_مساهم_'+donor.name+'.png'}]);
 }
 
 function generateGroupMessage(monthOffset) {
@@ -1706,9 +1806,7 @@ function generateGroupMessage(monthOffset) {
   drawSec('⏳ لم تُسجَّل مساهمتهم بعد',unpaidCodes,'#c0392b');
   ctx.fillStyle='#1a5c38'; roundRect(ctx,18,curY,W-36,50,10); ctx.fill();
   ctx.fillStyle='white'; ctx.font='bold 18px Cairo,Arial'; ctx.textAlign='center'; ctx.fillText('جزاكم الله خيراً وبارك في أموالكم 🤲',W/2,curY+32);
-  const img=document.getElementById('img-preview'); img.src=cvs.toDataURL('image/png');
-  currentDownloadName='رسالة_الجروب_'+thisM+'_'+thisY+'.png';
-  document.getElementById('img-modal').classList.add('open');
+  openReportModal([{url: cvs.toDataURL('image/png'), name: 'رسالة_الجروب_'+thisM+'_'+thisY+'.png'}]);
 }
 
 
