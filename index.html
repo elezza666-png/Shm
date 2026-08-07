@@ -1277,8 +1277,9 @@ function generateSixMonthsReport() {
     const mk=t.date.substring(0,7);
     if(!monthly[mk]) return;
     if(t.type==='donation'){
-      monthly[mk].in+=t.amount;
+      // استبعاد التبرع العام بالكامل من الوارد والإجماليات — يُحسب فقط عند وجود مساهم محدد
       if(t.donorId&&t.donorId!=='general'){
+        monthly[mk].in+=t.amount;
         monthly[mk].donors.add(t.donorId);
         if(!dStats[t.donorId])dStats[t.donorId]={total:0};
         dStats[t.donorId][mk]=(dStats[t.donorId][mk]||0)+t.amount;
