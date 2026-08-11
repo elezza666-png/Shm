@@ -1311,7 +1311,7 @@ function exportStatementImage(){
 }
 
 function exportActiveProjectsImage() {
-  const activeProjects = db.projects.filter(p => !p.isArchived && !p.isPrivate); if(!activeProjects.length) return toast('⚠️ لا توجد مشاريع فعالة لعرضها', 'error');
+  const activeProjects = db.projects.filter(p => !p.isArchived); if(!activeProjects.length) return toast('⚠️ لا توجد مشاريع فعالة لعرضها', 'error');
   const DPR=2, W=1100, HEADER_H=200, CARD_H=80, ROW_GAP=20, MARGIN=60; const H = HEADER_H + (activeProjects.length * (CARD_H + ROW_GAP)) + 140;
   const cvs=document.getElementById('export-canvas'); cvs.width=W*DPR; cvs.height=H*DPR; const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
   
@@ -1347,8 +1347,7 @@ function generateSixMonthsReport() {
     last6.push({m,y,label:`${m}/${y}`,key:`${y}-${String(m).padStart(2,'0')}`});
   }
 
-  const _priv = new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
-  const txns  = db.transactions.filter(t=>t.date&&t.date>=last6[0].key&&!_priv.has(t.projectId));
+  const txns  = db.transactions.filter(t=>t.date&&t.date>=last6[0].key);
   if(!txns.length) return toast('⚠️ لا توجد حركات في آخر 6 شهور','error');
 
   // تجميع البيانات
@@ -1610,12 +1609,10 @@ function generateTopDonorsReport() {
     last6Keys.push(`${y}-${String(m).padStart(2,'0')}`);
   }
 
-  const privateIds=new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
   const donorTotals={};
   db.transactions
     .filter(t=>t.type==='donation'&&t.donorId&&t.donorId!=='general'
-      &&t.date&&last6Keys.some(k=>t.date.startsWith(k))
-      &&!privateIds.has(t.projectId))
+      &&t.date&&last6Keys.some(k=>t.date.startsWith(k)))
     .forEach(t=>{donorTotals[t.donorId]=(donorTotals[t.donorId]||0)+t.amount;});
 
   const sorted=Object.entries(donorTotals)
@@ -1756,10 +1753,9 @@ function drawDonorCard(donorId) {
   const donor = db.donors.find(d => String(d.id) === String(donorId));
   if(!donor) { toast('⚠️ لم يُعثر على المساهم','error'); return; }
 
-  const _pvtCard = new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
-  const txns = db.transactions.filter(t => t.type==='donation' && String(t.donorId)===String(donorId) && !_pvtCard.has(t.projectId)).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const txns = db.transactions.filter(t => t.type==='donation' && String(t.donorId)===String(donorId)).sort((a,b)=>new Date(a.date)-new Date(b.date));
   const total = txns.reduce((s,t)=>s+t.amount,0);
-  const overallTotal = db.transactions.filter(t=>t.type==='donation'&&!_pvtCard.has(t.projectId)).reduce((s,t)=>s+t.amount,0);
+  const overallTotal = db.transactions.filter(t=>t.type==='donation').reduce((s,t)=>s+t.amount,0);
   const pct = overallTotal>0?Math.round(total/overallTotal*100):0;
   const count = txns.length;
   const firstDate = txns.length ? txns[0].date : '';
@@ -1859,15 +1855,14 @@ function generateGroupMessage(monthOffset) {
   const last6Keys=[]; for(let i=5;i>=0;i--){let m=thisM-i,y=thisY;if(m<=0){m+=12;y--;}last6Keys.push(`${y}-${String(m).padStart(2,'0')}`);}
   const prev5T=db.transactions.filter(t=>t.type==='donation'&&t.date&&last6Keys.slice(0,5).some(k=>t.date.startsWith(k))).reduce((s,t)=>s+t.amount,0);
   const avg5=prev5T/5;
-  const _pvt=new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
-  const thisTxns=db.transactions.filter(t=>t.type==='donation'&&t.date&&t.date.startsWith(monthKey)&&!_pvt.has(t.projectId));
+  const thisTxns=db.transactions.filter(t=>t.type==='donation'&&t.date&&t.date.startsWith(monthKey));
   const thisTotal=thisTxns.reduce((s,t)=>s+t.amount,0);
   const paidIds=new Set(thisTxns.filter(t=>t.donorId&&t.donorId!=='general').map(t=>String(t.donorId)));
   const paidCodes=[...paidIds].map(id=>db.donors.find(d=>String(d.id)===id)?.code||'?').sort();
   const unpaidCodes=db.donors.filter(d=>!d.isArchived&&!paidIds.has(String(d.id))).map(d=>d.code).sort();
   const thisCount=paidIds.size;
   const vsAvg=avg5>0?Math.round((thisTotal-avg5)/avg5*100):0;
-  const total6=db.transactions.filter(t=>t.type==='donation'&&t.date&&last6Keys.some(k=>t.date.startsWith(k))&&!_pvt.has(t.projectId)).reduce((s,t)=>s+t.amount,0);
+  const total6=db.transactions.filter(t=>t.type==='donation'&&t.date&&last6Keys.some(k=>t.date.startsWith(k))).reduce((s,t)=>s+t.amount,0);
 
   const DPR=2,W=1000; const rowsP=Math.ceil(paidCodes.length/5)||1; const rowsU=unpaidCodes.length?Math.ceil(unpaidCodes.length/5):0;
   const H=168+128+(rowsP*38+62)+(rowsU?rowsU*38+62:0)+66;
