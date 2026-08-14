@@ -1238,23 +1238,26 @@ function openWhatsApp(){
 // ==========================================
 function exportStatementPDF() {
   if(!selectedProject) return toast('⚠️ اختر مشروعاً','error');
-  const txns=db.transactions.filter(t=>t.projectId===selectedProject.id).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const txns=db.transactions.filter(t=>t.projectId===selectedProject.id).sort((a,b)=>new Date(a.date)-new Date(b.date));
   
-  const opening=selectedProject.openingBalance||0; let runBal=opening; const rows = [];
+  const opening=selectedProject.openingBalance||0; let runBal=opening; const rowsChrono = [];
   txns.forEach(t=>{
     const isIn=t.type==='donation'; if(isIn)runBal+=t.amount;else runBal-=t.amount;
     let displayDesc = getPrivacyDesc(t);
-    rows.push(`<tr style="page-break-inside: avoid;"><td dir="ltr">${formatDate(t.date)}</td><td dir="rtl" style="font-weight:bold; text-align:right;">${displayDesc}${t.notes?' — '+t.notes:''}</td><td dir="ltr" style="color:#27ae60;font-weight:bold;">${isIn?t.amount.toLocaleString('ar-EG'):'-'}</td><td dir="ltr" style="color:#c0392b;font-weight:bold;">${!isIn?t.amount.toLocaleString('ar-EG'):'-'}</td><td dir="ltr" style="font-weight:bold;">${runBal.toLocaleString('ar-EG')}</td></tr>`);
+    rowsChrono.push(`<tr style="page-break-inside: avoid;"><td dir="ltr">${formatDate(t.date)}</td><td dir="rtl" style="font-weight:bold; text-align:right;">${displayDesc}${t.notes?' — '+t.notes:''}</td><td dir="ltr" style="color:#27ae60;font-weight:bold;">${isIn?t.amount.toLocaleString('ar-EG'):'-'}</td><td dir="ltr" style="color:#c0392b;font-weight:bold;">${!isIn?t.amount.toLocaleString('ar-EG'):'-'}</td><td dir="ltr" style="font-weight:bold;">${runBal.toLocaleString('ar-EG')}</td></tr>`);
   });
+  const rows = [...rowsChrono].reverse(); // الأحدث فوق، مع الحفاظ على صحة عمود الرصيد التراكمي
   
   const totalIn=txns.filter(t=>t.type==='donation').reduce((s,t)=>s+t.amount,0), totalOut=txns.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0), finalBal=opening+totalIn-totalOut;
   
-  const pdfHtml = `<div class="pdf-body" style="background:#fff; color:#000; direction:rtl; font-family:'Cairo',sans-serif; padding:10px;"><style>.pdf-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; } .pdf-table th, .pdf-table td { padding: 10px; border: 1px solid #ddd; text-align: center; } .pdf-table th { background-color: #1a5c38 !important; color: white !important; -webkit-print-color-adjust: exact; } .pdf-total-box { display: flex; justify-content: space-around; margin-top: 20px; padding: 15px; background: #f0f7f0 !important; border-radius: 8px; -webkit-print-color-adjust: exact; }</style><div style="text-align:center; margin-bottom:20px; border-bottom:2px solid #1a5c38; padding-bottom:15px;"><div style="color:#1a5c38; font-size:26px; font-weight:bold; margin-bottom:8px;">كشف حساب مشروع: ${selectedProject.name}</div><div style="color:#555; font-size:14px;">تاريخ الإصدار: ${new Date().toLocaleDateString('ar-EG')} | رصيد أول المدة: ${opening.toLocaleString('ar-EG')} ج</div></div><div class="pdf-total-box"><div style="text-align:center;"><div style="font-size:13px; color:#555;">إجمالي الوارد</div><div style="font-size:20px; font-weight:bold; color:#27ae60;">${totalIn.toLocaleString('ar-EG')} ج</div></div><div style="text-align:center;"><div style="font-size:13px; color:#555;">إجمالي الصادر</div><div style="font-size:20px; font-weight:bold; color:#c0392b;">${totalOut.toLocaleString('ar-EG')} ج</div></div><div style="text-align:center;"><div style="font-size:13px; color:#555;">الرصيد النهائي</div><div style="font-size:20px; font-weight:bold;">${finalBal.toLocaleString('ar-EG')} ج</div></div></div><table class="pdf-table"><thead><tr><th>التاريخ</th><th style="text-align:right;">البيان</th><th>وارد</th><th>صادر</th><th>الرصيد</th></tr></thead><tbody>${rows.length ? rows.join('') : '<tr><td colspan="5">لا توجد حركات مسجلة</td></tr>'}</tbody></table><div style="text-align:center; margin-top:30px; color:#777; font-size:12px;">نظام إدارة التبرعات - تم استخراج التقرير آلياً (للنشر العام)</div></div>`;
+  const pdfHtml = `<div class="pdf-body" style="width:780px; background:#fff; color:#000; direction:rtl; font-family:'Cairo',sans-serif; padding:10px;"><style>.pdf-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; } .pdf-table th, .pdf-table td { padding: 10px; border: 1px solid #ddd; text-align: center; } .pdf-table th { background-color: #1a5c38 !important; color: white !important; -webkit-print-color-adjust: exact; } .pdf-total-box { display: flex; justify-content: space-around; margin-top: 20px; padding: 15px; background: #f0f7f0 !important; border-radius: 8px; -webkit-print-color-adjust: exact; }</style><div style="text-align:center; margin-bottom:20px; border-bottom:2px solid #1a5c38; padding-bottom:15px;"><div style="color:#1a5c38; font-size:26px; font-weight:bold; margin-bottom:8px;">كشف حساب مشروع: ${selectedProject.name}</div><div style="color:#555; font-size:14px;">تاريخ الإصدار: ${new Date().toLocaleDateString('ar-EG')} | رصيد أول المدة: ${opening.toLocaleString('ar-EG')} ج</div></div><div class="pdf-total-box"><div style="text-align:center;"><div style="font-size:13px; color:#555;">إجمالي الوارد</div><div style="font-size:20px; font-weight:bold; color:#27ae60;">${totalIn.toLocaleString('ar-EG')} ج</div></div><div style="text-align:center;"><div style="font-size:13px; color:#555;">إجمالي الصادر</div><div style="font-size:20px; font-weight:bold; color:#c0392b;">${totalOut.toLocaleString('ar-EG')} ج</div></div><div style="text-align:center;"><div style="font-size:13px; color:#555;">الرصيد النهائي</div><div style="font-size:20px; font-weight:bold;">${finalBal.toLocaleString('ar-EG')} ج</div></div></div><table class="pdf-table"><thead><tr><th>التاريخ</th><th style="text-align:right;">البيان</th><th>وارد</th><th>صادر</th><th>الرصيد</th></tr></thead><tbody>${rows.length ? rows.join('') : '<tr><td colspan="5">لا توجد حركات مسجلة</td></tr>'}</tbody></table><div style="text-align:center; margin-top:30px; color:#777; font-size:12px;">نظام إدارة التبرعات - تم استخراج التقرير آلياً (للنشر العام)</div></div>`;
   
-  const container = document.getElementById('pdf-container'); container.innerHTML = pdfHtml; container.style.display = 'block';
+  const container = document.getElementById('pdf-container'); container.innerHTML = pdfHtml;
+  container.style.cssText = 'display:block; position:fixed; top:0; left:0; z-index:-1; background:#fff;';
+  window.scrollTo(0,0);
   toast('⏳ جاري التجهيز...', 'info');
-  const opt = { margin: [0.5, 0.5, 0.5, 0.5], filename: `كشف_حساب_${selectedProject.name}.pdf`, image: { type: 'jpeg', quality: 1 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: 'css', avoid: 'tr' } };
-  html2pdf().set(opt).from(container).save().then(() => { container.style.display = 'none'; toast('✅ تم التحميل', 'success'); });
+  const opt = { margin: [0.5, 0.5, 0.5, 0.5], filename: `كشف_حساب_${selectedProject.name}.pdf`, image: { type: 'jpeg', quality: 1 }, html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0, windowWidth: container.scrollWidth, windowHeight: container.scrollHeight }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: 'css', avoid: 'tr' } };
+  html2pdf().set(opt).from(container).save().then(() => { container.style.cssText = 'display:none;'; toast('✅ تم التحميل', 'success'); }).catch(() => { container.style.cssText = 'display:none;'; toast('⚠️ تعذر إنشاء الملف، حاول مرة أخرى', 'error'); });
 }
 
 // ==========================================
@@ -1275,7 +1278,7 @@ function exportStatementImage(){
   });
   
   const totalIn=txns.filter(t=>t.type==='donation').reduce((s,t)=>s+t.amount,0), totalOut=txns.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0), finalBal=opening+totalIn-totalOut;
-  const MAX_ROWS=20; const displayRows=rows.slice(-MAX_ROWS);
+  const MAX_ROWS=20; const displayRows=rows.slice(-MAX_ROWS).reverse(); // الأحدث فوق، مع الحفاظ على صحة عمود الرصيد التراكمي
   const DPR=2, W=1200, ROW_H=65, HEADER_H=300, FOOTER_H=80; const H = HEADER_H + 90 + (displayRows.length * ROW_H) + FOOTER_H + (displayRows.length===0 ? 100 : 0);
   
   const cvs=document.getElementById('export-canvas'); cvs.width=W*DPR; cvs.height=H*DPR; const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
