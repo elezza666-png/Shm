@@ -148,6 +148,31 @@
     .btn[data-loading]::after { content: ' ⏳'; }
 
     #pdf-container { display: none; }
+
+    /* ============================================================
+       طباعة كشف الحساب (بديل html2pdf) — يظهر فقط عند الطباعة/حفظ PDF
+       ============================================================ */
+    #print-area { display: none; }
+    @media print {
+      body * { visibility: hidden; }
+      #print-area, #print-area * { visibility: visible; }
+      #print-area { display: block; position: absolute; top: 0; left: 0; width: 100%; }
+      @page { size: A4; margin: 12mm; }
+      .print-body { direction: rtl; font-family: 'Cairo', Arial, sans-serif; color: #000; }
+      .print-header { text-align: center; margin-bottom: 16px; border-bottom: 2px solid #1a5c38; padding-bottom: 12px; }
+      .print-title { color: #1a5c38; font-size: 22px; font-weight: bold; margin-bottom: 6px; }
+      .print-sub { color: #444; font-size: 12px; }
+      .print-total-box { display: flex; justify-content: space-around; margin-bottom: 16px; padding: 10px; background: #f0f7f0 !important; border-radius: 8px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .print-total-item { text-align: center; }
+      .print-total-label { font-size: 11px; color: #444; }
+      .print-total-value { font-size: 16px; font-weight: bold; }
+      .print-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      .print-table th, .print-table td { padding: 7px; border: 1px solid #ccc; text-align: center; }
+      .print-table thead { display: table-header-group; } /* تكرار رأس الجدول في كل صفحة */
+      .print-table th { background-color: #1a5c38 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .print-table tr { page-break-inside: avoid; }
+      .print-footer { text-align: center; margin-top: 20px; color: #777; font-size: 11px; }
+    }
   </style>
 </head>
 <body>
@@ -603,6 +628,7 @@
 </div>
 
 <div id="pdf-container"></div>
+<div id="print-area"></div>
 <canvas id="export-canvas"></canvas>
 <div class="toast" id="toast"></div>
 
@@ -1234,31 +1260,36 @@ function openWhatsApp(){
 }
 
 // ==========================================
-// 8. تصدير PDF لكشف الحساب
+// 8. تصدير PDF لكشف الحساب — عبر طباعة المتصفح الأصلية
+// (بديل جذري عن html2pdf/html2canvas اللي كان بيقطّع الصفوف
+//  ويطلع صفحات فارغة بسبب القص بالبكسل بدل احترام حدود الجدول)
 // ==========================================
 function exportStatementPDF() {
   if(!selectedProject) return toast('⚠️ اختر مشروعاً','error');
   const txns=db.transactions.filter(t=>t.projectId===selectedProject.id).sort((a,b)=>new Date(a.date)-new Date(b.date));
-  
+
   const opening=selectedProject.openingBalance||0; let runBal=opening; const rowsChrono = [];
   txns.forEach(t=>{
     const isIn=t.type==='donation'; if(isIn)runBal+=t.amount;else runBal-=t.amount;
     let displayDesc = getPrivacyDesc(t);
-    rowsChrono.push(`<tr style="page-break-inside: avoid;"><td dir="ltr">${formatDate(t.date)}</td><td dir="rtl" style="font-weight:bold; text-align:right;">${displayDesc}${t.notes?' — '+t.notes:''}</td><td dir="ltr" style="color:#27ae60;font-weight:bold;">${isIn?t.amount.toLocaleString('ar-EG'):'-'}</td><td dir="ltr" style="color:#c0392b;font-weight:bold;">${!isIn?t.amount.toLocaleString('ar-EG'):'-'}</td><td dir="ltr" style="font-weight:bold;">${runBal.toLocaleString('ar-EG')}</td></tr>`);
+    rowsChrono.push(`<tr><td dir="ltr">${formatDate(t.date)}</td><td dir="rtl" style="font-weight:bold; text-align:right;">${displayDesc}${t.notes?' — '+t.notes:''}</td><td dir="ltr" style="color:#27ae60;font-weight:bold;">${isIn?t.amount.toLocaleString('ar-EG'):'-'}</td><td dir="ltr" style="color:#c0392b;font-weight:bold;">${!isIn?t.amount.toLocaleString('ar-EG'):'-'}</td><td dir="ltr" style="font-weight:bold;">${runBal.toLocaleString('ar-EG')}</td></tr>`);
   });
   const rows = [...rowsChrono].reverse(); // الأحدث فوق، مع الحفاظ على صحة عمود الرصيد التراكمي
-  
+
   const totalIn=txns.filter(t=>t.type==='donation').reduce((s,t)=>s+t.amount,0), totalOut=txns.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0), finalBal=opening+totalIn-totalOut;
-  
-  const pdfHtml = `<div class="pdf-body" style="width:780px; background:#fff; color:#000; direction:rtl; font-family:'Cairo',sans-serif; padding:10px;"><style>.pdf-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; } .pdf-table th, .pdf-table td { padding: 10px; border: 1px solid #ddd; text-align: center; } .pdf-table th { background-color: #1a5c38 !important; color: white !important; -webkit-print-color-adjust: exact; } .pdf-total-box { display: flex; justify-content: space-around; margin-top: 20px; padding: 15px; background: #f0f7f0 !important; border-radius: 8px; -webkit-print-color-adjust: exact; }</style><div style="text-align:center; margin-bottom:20px; border-bottom:2px solid #1a5c38; padding-bottom:15px;"><div style="color:#1a5c38; font-size:26px; font-weight:bold; margin-bottom:8px;">كشف حساب مشروع: ${selectedProject.name}</div><div style="color:#555; font-size:14px;">تاريخ الإصدار: ${new Date().toLocaleDateString('ar-EG')} | رصيد أول المدة: ${opening.toLocaleString('ar-EG')} ج</div></div><div class="pdf-total-box"><div style="text-align:center;"><div style="font-size:13px; color:#555;">إجمالي الوارد</div><div style="font-size:20px; font-weight:bold; color:#27ae60;">${totalIn.toLocaleString('ar-EG')} ج</div></div><div style="text-align:center;"><div style="font-size:13px; color:#555;">إجمالي الصادر</div><div style="font-size:20px; font-weight:bold; color:#c0392b;">${totalOut.toLocaleString('ar-EG')} ج</div></div><div style="text-align:center;"><div style="font-size:13px; color:#555;">الرصيد النهائي</div><div style="font-size:20px; font-weight:bold;">${finalBal.toLocaleString('ar-EG')} ج</div></div></div><table class="pdf-table"><thead><tr><th>التاريخ</th><th style="text-align:right;">البيان</th><th>وارد</th><th>صادر</th><th>الرصيد</th></tr></thead><tbody>${rows.length ? rows.join('') : '<tr><td colspan="5">لا توجد حركات مسجلة</td></tr>'}</tbody></table><div style="text-align:center; margin-top:30px; color:#777; font-size:12px;">نظام إدارة التبرعات - تم استخراج التقرير آلياً (للنشر العام)</div></div>`;
-  
-  const container = document.getElementById('pdf-container'); container.innerHTML = pdfHtml;
-  container.style.cssText = 'display:block; position:fixed; top:0; left:0; z-index:-1; background:#fff;';
-  window.scrollTo(0,0);
-  toast('⏳ جاري التجهيز...', 'info');
-  const opt = { margin: [0.5, 0.5, 0.5, 0.5], filename: `كشف_حساب_${selectedProject.name}.pdf`, image: { type: 'jpeg', quality: 1 }, html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0, windowWidth: container.scrollWidth, windowHeight: container.scrollHeight }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: 'css', avoid: 'tr' } };
-  html2pdf().set(opt).from(container).save().then(() => { container.style.cssText = 'display:none;'; toast('✅ تم التحميل', 'success'); }).catch(() => { container.style.cssText = 'display:none;'; toast('⚠️ تعذر إنشاء الملف، حاول مرة أخرى', 'error'); });
+
+  const printHtml = `<div class="print-body"><div class="print-header"><div class="print-title">كشف حساب مشروع: ${selectedProject.name}</div><div class="print-sub">تاريخ الإصدار: ${new Date().toLocaleDateString('ar-EG')} | رصيد أول المدة: ${opening.toLocaleString('ar-EG')} ج</div></div><div class="print-total-box"><div class="print-total-item"><div class="print-total-label">إجمالي الوارد</div><div class="print-total-value" style="color:#27ae60;">${totalIn.toLocaleString('ar-EG')} ج</div></div><div class="print-total-item"><div class="print-total-label">إجمالي الصادر</div><div class="print-total-value" style="color:#c0392b;">${totalOut.toLocaleString('ar-EG')} ج</div></div><div class="print-total-item"><div class="print-total-label">الرصيد النهائي</div><div class="print-total-value">${finalBal.toLocaleString('ar-EG')} ج</div></div></div><table class="print-table"><thead><tr><th>التاريخ</th><th style="text-align:right;">البيان</th><th>وارد</th><th>صادر</th><th>الرصيد</th></tr></thead><tbody>${rows.length ? rows.join('') : '<tr><td colspan="5">لا توجد حركات مسجلة</td></tr>'}</tbody></table><div class="print-footer">نظام إدارة التبرعات - تم استخراج التقرير آلياً (للنشر العام)</div></div>`;
+
+  document.getElementById('print-area').innerHTML = printHtml;
+  const oldTitle = document.title;
+  document.title = `كشف_حساب_${selectedProject.name}`; // بعض المتصفحات بتقترحه كاسم الملف تلقائياً عند "حفظ كـ PDF"
+  toast('📄 اختر "حفظ كـ PDF" من نافذة الطباعة', 'info');
+
+  const cleanup = () => { document.title = oldTitle; document.getElementById('print-area').innerHTML=''; window.removeEventListener('afterprint', cleanup); };
+  window.addEventListener('afterprint', cleanup);
+  setTimeout(() => { window.print(); setTimeout(cleanup, 2000); }, 150);
 }
+
 
 // ==========================================
 // 9. رسم الكانفاس (الصور)
