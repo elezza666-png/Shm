@@ -1345,7 +1345,7 @@ function exportStatementImage(){
 }
 
 function exportActiveProjectsImage() {
-  const activeProjects = db.projects.filter(p => !p.isArchived); if(!activeProjects.length) return toast('⚠️ لا توجد مشاريع فعالة لعرضها', 'error');
+  const activeProjects = db.projects.filter(p => !p.isArchived && !p.isPrivate); if(!activeProjects.length) return toast('⚠️ لا توجد مشاريع فعالة لعرضها', 'error');
   const DPR=2, W=1100, HEADER_H=200, CARD_H=80, ROW_GAP=20, MARGIN=60; const H = HEADER_H + (activeProjects.length * (CARD_H + ROW_GAP)) + 140;
   const cvs=document.getElementById('export-canvas'); cvs.width=W*DPR; cvs.height=H*DPR; const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
   
