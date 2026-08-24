@@ -564,6 +564,7 @@
     <div class="modal-title">✏️ تعديل الحركة</div>
     <input type="hidden" id="edit-tx-id">
     <div class="form-group" id="edit-tx-desc-wrapper" style="display:none; margin-bottom:14px;"><label>البيان</label><input type="text" id="edit-tx-desc"></div>
+    <div class="form-group" id="edit-tx-beneficiary-wrapper" style="display:none; margin-bottom:14px;"><label>🏠 المستفيد (اختياري)</label><select id="edit-tx-beneficiary" onchange="toggleEditTxDescRequired()" style="padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-family:Cairo,sans-serif;font-size:14px;width:100%;"><option value="">-- بدون مستفيد --</option></select></div>
     <div class="form-group" id="edit-tx-donor-wrapper" style="display:none; margin-bottom:14px;"><label>المتبرع</label><select id="edit-tx-donor"></select></div>
     <div style="margin-bottom:14px;"><label>المبلغ</label><input type="number" id="edit-tx-amount" min="1"></div>
     <div style="margin-bottom:14px;"><label>التاريخ</label><input type="date" id="edit-tx-date"></div>
@@ -1146,13 +1147,25 @@ async function saveExpense(){
   toast('✅ تم تسجيل المصروف','success');
 }
 
+function toggleEditTxDescRequired(){
+  const wrap = document.getElementById('edit-tx-desc-wrapper');
+  if(!wrap) return;
+  // البيان دايماً متاح للتعديل، بس مش إلزامي لو فيه مستفيد محدد (نفس منطق فورم إضافة المصروف)
+}
+
 function openEditTx(id) {
   const tx = db.transactions.find(t=>t.id===id); if(!tx) return;
   document.getElementById('edit-tx-id').value = id; document.getElementById('edit-tx-amount').value = tx.amount; document.getElementById('edit-tx-date').value = tx.date; document.getElementById('edit-tx-notes').value = tx.notes || '';
   if (tx.type === 'donation') { 
-      document.getElementById('edit-tx-desc-wrapper').style.display = (tx.donorId === 'general') ? 'flex' : 'none'; document.getElementById('edit-tx-donor-wrapper').style.display = 'flex'; populateDonorSelect('edit-tx-donor'); document.getElementById('edit-tx-donor').value = tx.donorId; 
+      document.getElementById('edit-tx-desc-wrapper').style.display = (tx.donorId === 'general') ? 'flex' : 'none'; document.getElementById('edit-tx-donor-wrapper').style.display = 'flex'; document.getElementById('edit-tx-beneficiary-wrapper').style.display = 'none'; populateDonorSelect('edit-tx-donor'); document.getElementById('edit-tx-donor').value = tx.donorId; 
       if(tx.donorId === 'general') document.getElementById('edit-tx-desc').value = tx.desc;
-  } else { document.getElementById('edit-tx-donor-wrapper').style.display = 'none'; document.getElementById('edit-tx-desc-wrapper').style.display = 'flex'; document.getElementById('edit-tx-desc').value = tx.desc; }
+  } else {
+      document.getElementById('edit-tx-donor-wrapper').style.display = 'none';
+      document.getElementById('edit-tx-desc-wrapper').style.display = 'flex'; document.getElementById('edit-tx-desc').value = tx.desc;
+      document.getElementById('edit-tx-beneficiary-wrapper').style.display = 'flex';
+      populateBeneficiarySelect('edit-tx-beneficiary');
+      document.getElementById('edit-tx-beneficiary').value = tx.beneficiaryId || '';
+  }
   document.getElementById('edit-tx-donor').onchange = function() { document.getElementById('edit-tx-desc-wrapper').style.display = (this.value === 'general') ? 'flex' : 'none'; };
   document.getElementById('edit-tx-modal').classList.add('open');
 }
@@ -1166,7 +1179,13 @@ async function saveEditTx() {
       const dId = document.getElementById('edit-tx-donor').value; if(!dId) return toast('⚠️ اختر المتبرع', 'error'); 
       if(dId === 'general') { const desc = document.getElementById('edit-tx-desc').value.trim(); if(!desc) return toast('⚠️ أدخل البيان', 'error'); tx.donorId = 'general'; tx.desc = desc; } 
       else { tx.donorId = parseInt(dId); tx.desc = 'مساهمة'; }
-  } else { const desc = document.getElementById('edit-tx-desc').value.trim(); if(!desc && !tx.beneficiaryId) return toast('⚠️ أدخل البيان', 'error'); tx.desc = desc; }
+  } else {
+      const desc = document.getElementById('edit-tx-desc').value.trim();
+      const benVal = document.getElementById('edit-tx-beneficiary').value;
+      const beneficiaryId = benVal ? parseInt(benVal) : null;
+      if(!desc && !beneficiaryId) return toast('⚠️ أدخل البيان أو اختر مستفيداً', 'error');
+      tx.desc = desc; tx.beneficiaryId = beneficiaryId;
+  }
   await saveDB(); closeModal('edit-tx-modal'); toast('✅ تم تعديل الحركة', 'success');
 }
 
@@ -2230,9 +2249,9 @@ function getBenLabel(benId) {
   return b.showName ? b.name : b.code;
 }
 
-function populateBeneficiarySelect() {
+function populateBeneficiarySelect(selectId) {
   if(!db.beneficiaries) db.beneficiaries=[];
-  const sel=document.getElementById('exp-beneficiary');
+  const sel=document.getElementById(selectId || 'exp-beneficiary');
   if(!sel) return;
   const cur=sel.value;
   sel.innerHTML='<option value="">-- بدون مستفيد --</option>';
