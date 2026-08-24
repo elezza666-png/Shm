@@ -2323,14 +2323,32 @@ function exportBenReportImage(benId) {
   for(let i=0;i<txns.length;i+=PAGE_SIZE) pages.push(txns.slice(i,i+PAGE_SIZE));
   const numPages=pages.length;
 
-  const DPR=2, W=1200, ROW_H=65, HEADER_H=260, FOOTER_H=80;
-  const colX=[W-60, W-260, W-750, 100]; // التاريخ، الصندوق، البيان، المبلغ
+  const DPR=2, W=1200, HEADER_H=260, FOOTER_H=80;
+  // حدود الأعمدة الفعلية (RTL): التاريخ | الصندوق (أصغر) | البيان (عريض) | المبلغ
+  const M=40; // الهامش الجانبي
+  const dateW=140, projW=130, amtW=170, gap=16;
+  const dateRight=W-M, dateLeft=dateRight-dateW;
+  const projRight=dateLeft, projLeft=projRight-projW;
+  const amtLeft=M, amtRight=amtLeft+amtW;
+  const descRight=projLeft, descLeft=amtRight+gap;
+  const descW = descRight-descLeft;
+  const BASE_ROW_H=54, NOTE_LINE_H=24;
+
+  function truncateToWidth(ctx,text,maxW){
+    if(ctx.measureText(text).width<=maxW) return text;
+    let t=text;
+    while(t.length>1 && ctx.measureText(t+'…').width>maxW){ t=t.slice(0,-1); }
+    return t+'…';
+  }
 
   const cvs=document.getElementById('export-canvas');
   const images=[];
 
   pages.forEach((pageTxns,pageIdx)=>{
-    const H = HEADER_H + 90 + (pageTxns.length*ROW_H) + FOOTER_H;
+    // احسب ارتفاع كل صف مسبقاً (أطول لو فيه ملاحظات)
+    const rowHeights = pageTxns.map(t=> t.notes ? BASE_ROW_H+NOTE_LINE_H : BASE_ROW_H);
+    const rowsTotalH = rowHeights.reduce((s,h)=>s+h,0);
+    const H = HEADER_H + 90 + rowsTotalH + FOOTER_H;
     cvs.width=W*DPR; cvs.height=H*DPR;
     const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
 
@@ -2359,27 +2377,35 @@ function exportBenReportImage(benId) {
     const TY=HEADER_H+80;
     ctx.fillStyle='#e8efe9'; ctx.beginPath(); ctx.roundRect(40,TY,W-80,60,10); ctx.fill();
     ctx.fillStyle='#1a5c38'; ctx.font='bold 24px Cairo,Arial';
-    ctx.textAlign='right'; ctx.fillText('التاريخ',colX[0],TY+40); ctx.fillText('الصندوق',colX[1],TY+40); ctx.fillText('البيان',colX[2],TY+40);
-    ctx.textAlign='left'; ctx.fillText('المبلغ',colX[3],TY+40);
+    ctx.textAlign='right'; ctx.fillText('التاريخ',dateRight-15,TY+40); ctx.fillText('الصندوق',projRight-15,TY+40); ctx.fillText('البيان',descRight-15,TY+40);
+    ctx.textAlign='left'; ctx.fillText('المبلغ',amtLeft+15,TY+40);
 
     let y=TY+60;
     pageTxns.forEach((t,idx)=>{
+      const rowH = rowHeights[idx];
       const proj=db.projects.find(p=>String(p.id)===String(t.projectId));
       ctx.fillStyle=idx%2===0?'#ffffff':'#f2f7f2';
-      ctx.fillRect(40,y,W-80,ROW_H);
+      ctx.fillRect(40,y,W-80,rowH);
       ctx.strokeStyle='#e0eee0'; ctx.lineWidth=1;
-      ctx.beginPath(); ctx.moveTo(40,y+ROW_H); ctx.lineTo(W-40,y+ROW_H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(40,y+rowH); ctx.lineTo(W-40,y+rowH); ctx.stroke();
 
-      ctx.fillStyle='#333'; ctx.font='20px Cairo,Arial'; ctx.textAlign='right';
-      ctx.fillText(formatDate(t.date), colX[0], y+ROW_H/2+7);
-      ctx.fillText(proj?proj.name:'-', colX[1], y+ROW_H/2+7);
-      const descText=(t.desc||'-')+(t.notes?' — '+t.notes:'');
-      ctx.font='bold 20px Cairo,Arial';
-      ctx.fillText(descText.length>42?descText.slice(0,42)+'…':descText, colX[2], y+ROW_H/2+7);
-      ctx.fillStyle='#c0392b'; ctx.font='bold 22px Cairo,Arial'; ctx.textAlign='left';
-      ctx.fillText(t.amount.toLocaleString('ar-EG')+' ج', colX[3], y+ROW_H/2+7);
+      const midY = t.notes ? y+BASE_ROW_H/2+6 : y+rowH/2+7;
 
-      y+=ROW_H;
+      ctx.fillStyle='#333'; ctx.font='19px Cairo,Arial'; ctx.textAlign='right';
+      ctx.fillText(truncateToWidth(ctx,formatDate(t.date),dateW-20), dateRight-15, midY);
+      ctx.fillText(truncateToWidth(ctx,proj?proj.name:'-',projW-20), projRight-15, midY);
+
+      ctx.font='bold 19px Cairo,Arial';
+      ctx.fillText(truncateToWidth(ctx,t.desc||'-',descW-15), descRight-15, midY);
+      if(t.notes){
+        ctx.fillStyle='#8a9a8a'; ctx.font='italic 15px Cairo,Arial';
+        ctx.fillText(truncateToWidth(ctx,'📝 '+t.notes,descW-15), descRight-15, y+BASE_ROW_H/2+6+NOTE_LINE_H);
+      }
+
+      ctx.fillStyle='#c0392b'; ctx.font='bold 21px Cairo,Arial'; ctx.textAlign='left';
+      ctx.fillText(t.amount.toLocaleString('ar-EG')+' ج', amtLeft+15, midY);
+
+      y+=rowH;
     });
 
     ctx.textAlign='center'; ctx.fillStyle='#88a888'; ctx.font='bold 18px Cairo,Arial';
