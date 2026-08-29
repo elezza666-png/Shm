@@ -748,6 +748,7 @@ async function shareAllReportPagesToWhatsApp(){
       db.projects     = p.projects     || [];
       db.transactions = p.transactions || [];
       db.cases        = p.cases        || [];
+      db.beneficiaries = p.beneficiaries || [];
       if(p.qard) db.qard = { deposits: p.qard.deposits||[], loans: p.qard.loans||[] };
     }
   } catch(e) {}
