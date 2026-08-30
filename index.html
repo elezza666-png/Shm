@@ -346,7 +346,10 @@
     <div style="margin-top:16px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="safeClick(this, saveProject)">✅ إضافة المشروع</button></div>
   </div>
   <div class="card" style="padding:0;">
-    <div style="padding:18px;"><div class="card-title" style="margin:0;">📋 قائمة المشاريع (الفعالة والمؤرشفة)</div></div>
+    <div style="padding:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <div class="card-title" style="margin:0;">📋 قائمة المشاريع (الفعالة والمؤرشفة)</div>
+      <button class="btn btn-accent btn-sm" onclick="exportActiveFundsUpdateImage()">📢 مشاركة تحديثات الصناديق</button>
+    </div>
     <div class="table-wrap" style="border:none;border-radius:0 0 16px 16px;border-top:1px solid var(--border);">
       <table>
         <thead><tr><th>الحالة</th><th>المشروع</th><th>رصيد أول</th><th>الرصيد الحالي</th><th>إجراءات</th></tr></thead>
@@ -1078,7 +1081,7 @@ document.addEventListener('click', function(e) {
 async function saveProject(){
   const name=document.getElementById('proj-name').value.trim(), desc=document.getElementById('proj-desc').value.trim(), opening=parseFloat(document.getElementById('proj-opening').value||0), isPrivate=document.getElementById('proj-private').checked;
   if(!name) return toast('⚠️ أدخل اسم المشروع','error');
-  db.projects.push({id:Date.now(), name, desc, openingBalance:opening, isArchived: false, isPrivate: isPrivate, createdAt:new Date().toISOString()}); await saveDB();
+  db.projects.push({id:Date.now(), name, desc, openingBalance:opening, isArchived: false, isPrivate: isPrivate, lastSharedTxnCount:0, createdAt:new Date().toISOString()}); await saveDB();
   document.getElementById('proj-name').value=''; document.getElementById('proj-desc').value=''; document.getElementById('proj-opening').value='0'; document.getElementById('proj-private').checked=false; toast('✅ تم الإضافة', 'success');
 }
 function openEditProject(id){
@@ -1091,15 +1094,68 @@ async function saveEditProject(){
 }
 async function deleteProject(id){ if(!confirm('حذف نهائي للمشروع؟'))return; db.projects=db.projects.filter(p=>p.id!==id); db.transactions=db.transactions.filter(t=>t.projectId!==id); if(selectedProject&&selectedProject.id===id){selectedProject=null; document.getElementById('project-actions').style.display='none';} await saveDB(); toast('🗑️ تم الحذف', 'success'); }
 async function toggleArchiveProject(id) { const p=db.projects.find(x=>x.id===id); if(!p)return; p.isArchived = !p.isArchived; if(p.isArchived && selectedProject && selectedProject.id===id){ selectedProject=null; document.getElementById('project-actions').style.display='none'; } await saveDB(); toast(p.isArchived ? '📦 تم أرشفة المشروع' : '🔄 تم استرجاع المشروع', 'success'); }
+
+// تقرير "تحديثات الصناديق" — الصناديق الغير خاصة اللي حصل فيها تعاملات جديدة منذ آخر مشاركة
+// بمجرد توليد التقرير، يتصفّر عداد كل صندوق ظهر فيه (يبدأ العد من جديد)
+async function exportActiveFundsUpdateImage() {
+  const updated = db.projects.filter(p => !p.isArchived && !p.isPrivate && getNewTxnCount(p.id) > 0);
+  if(!updated.length) return toast('⚠️ لا توجد صناديق بها تحديثات جديدة منذ آخر مشاركة', 'error');
+
+  const rows = updated.map(p => ({ name: p.name, count: getNewTxnCount(p.id), bal: getProjectBalance(p.id) }));
+
+  const DPR=2, W=1100, HEADER_H=200, CARD_H=90, ROW_GAP=18, MARGIN=60;
+  const H = HEADER_H + (rows.length * (CARD_H + ROW_GAP)) + 140;
+  const cvs=document.getElementById('export-canvas'); cvs.width=W*DPR; cvs.height=H*DPR; const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
+
+  ctx.fillStyle='#f0f4f0'; ctx.fillRect(0,0,W,H);
+  const gH=ctx.createLinearGradient(0,0,W,HEADER_H); gH.addColorStop(0,'#0a2e1a'); gH.addColorStop(1,'#2d8a56');
+  ctx.fillStyle=gH; ctx.fillRect(0,0,W,HEADER_H);
+  ctx.textAlign='center'; ctx.fillStyle='white'; ctx.font='bold 44px Cairo,Arial'; ctx.fillText('📢 تحديثات الصناديق', W/2, 90);
+  ctx.fillStyle='#ffd166'; ctx.font='bold 20px Cairo,Arial'; ctx.fillText('صناديق حصل فيها تعاملات جديدة — تابعوها معنا 🌿', W/2, 135);
+  ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='16px Cairo,Arial'; ctx.fillText(new Date().toLocaleDateString('ar-EG'), W/2, 165);
+
+  let y = HEADER_H + 30;
+  rows.forEach(r=>{
+    ctx.shadowColor='rgba(0,0,0,0.08)'; ctx.shadowBlur=14; ctx.shadowOffsetY=6;
+    ctx.fillStyle='white'; ctx.beginPath(); ctx.roundRect(MARGIN, y, W-MARGIN*2, CARD_H, 14); ctx.fill();
+    ctx.shadowColor='transparent';
+    ctx.textAlign='right'; ctx.fillStyle='#0f3d25'; ctx.font='bold 26px Cairo,Arial'; ctx.fillText(r.name, W-MARGIN-25, y+38);
+    ctx.fillStyle='#5a7a5a'; ctx.font='16px Cairo,Arial'; ctx.fillText('الرصيد الحالي: ' + r.bal.toLocaleString('ar-EG') + ' ج', W-MARGIN-25, y+66);
+    ctx.textAlign='left'; ctx.fillStyle='#c0392b'; ctx.font='bold 22px Cairo,Arial'; ctx.fillText('🆕 ' + r.count + ' حركة جديدة', MARGIN+25, y+CARD_H/2+8);
+    y += CARD_H + ROW_GAP;
+  });
+
+  ctx.textAlign='center'; ctx.fillStyle='#88a888'; ctx.font='bold 17px Cairo,Arial';
+  ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿  —  جزاكم الله خيراً', W/2, y+30);
+
+  openReportModal([{url: cvs.toDataURL('image/png'), name: 'تحديثات_الصناديق.png'}]);
+
+  // تصفير عداد كل صندوق ظهر في هذا التقرير
+  updated.forEach(p => { p.lastSharedTxnCount = db.transactions.filter(t=>t.projectId===p.id).length; });
+  await saveDB();
+}
+
 function renderProjectsTable(){
+  // migration: أي مشروع قديم من غير عداد مشاركة، نبدأ عداده من صفر (من دلوقتي فصاعداً) بدل ما تظهر كل حركاته القديمة كـ"جديدة"
+  let migrated=false;
+  db.projects.forEach(p=>{
+    if(typeof p.lastSharedTxnCount === 'undefined'){
+      p.lastSharedTxnCount = db.transactions.filter(t=>t.projectId===p.id).length;
+      migrated=true;
+    }
+  });
+  if(migrated) saveDB();
+
   const tbody=document.getElementById('projects-table-body'); if(!db.projects.length){tbody.innerHTML='<tr><td colspan="5"><div class="empty">لا توجد مشاريع</div></td></tr>';return;}
   const sorted = [...db.projects].sort((a,b) => (a.isArchived === b.isArchived) ? 0 : a.isArchived ? 1 : -1);
   tbody.innerHTML=sorted.map(p=>{
     const bal=getProjectBalance(p.id), opening=p.openingBalance||0;
     const archiveBadge = p.isArchived ? '<span class="badge badge-archived">مؤرشف</span> ' : '<span class="badge badge-active">فعال</span> ';
     const privateBadge = p.isPrivate ? '<span class="badge badge-private">🔒 خاص</span>' : '';
+    const newCount = (!p.isArchived && !p.isPrivate) ? getNewTxnCount(p.id) : 0;
+    const newBadge = newCount>0 ? `<span class="badge" style="background:#fff3cd;color:#856404;">🆕 ${newCount} جديد</span>` : '';
     const archiveBtn = `<button class="btn ${p.isArchived ? 'btn-info' : 'btn-outline'} btn-sm" onclick="toggleArchiveProject(${p.id})">${p.isArchived ? '🔄 استرجاع' : '📦 أرشفة'}</button>`;
-    return `<tr style="${p.isArchived ? 'opacity:0.7;' : ''}"><td>${archiveBadge} ${privateBadge}</td><td><strong>${p.name}</strong></td><td>${opening.toLocaleString('ar-EG')}</td><td class="${bal>=0?'balance-pos':'balance-neg'}">${bal.toLocaleString('ar-EG')}</td><td style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn btn-warn btn-sm" onclick="openEditProject(${p.id})">✏️</button>${archiveBtn}<button class="btn btn-danger btn-sm" onclick="deleteProject(${p.id})">🗑️</button></td></tr>`;
+    return `<tr style="${p.isArchived ? 'opacity:0.7;' : ''}"><td>${archiveBadge} ${privateBadge} ${newBadge}</td><td><strong>${p.name}</strong></td><td>${opening.toLocaleString('ar-EG')}</td><td class="${bal>=0?'balance-pos':'balance-neg'}">${bal.toLocaleString('ar-EG')}</td><td style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn btn-warn btn-sm" onclick="openEditProject(${p.id})">✏️</button>${archiveBtn}<button class="btn btn-danger btn-sm" onclick="deleteProject(${p.id})">🗑️</button></td></tr>`;
   }).join('');
 }
 
@@ -1109,6 +1165,13 @@ function renderProjectsTable(){
 function getProjectBalance(projectId) {
   const proj = db.projects.find(p=>p.id===projectId); const opening = proj ? (proj.openingBalance||0) : 0;
   const txnBalance = db.transactions.filter(t=>t.projectId===projectId).reduce((b,t) => t.type==='donation' ? b+t.amount : b-t.amount, 0); return opening + txnBalance;
+}
+
+// عدّاد "السجلات الجديدة منذ آخر مشاركة" لكل صندوق (يصفّر عند مشاركة تحديثات الصناديق)
+function getNewTxnCount(projectId) {
+  const p = db.projects.find(x=>x.id===projectId); if(!p) return 0;
+  const total = db.transactions.filter(t=>t.projectId===projectId).length;
+  return Math.max(0, total - (p.lastSharedTxnCount||0));
 }
 function renderHomePage() {
   const grid = document.getElementById('home-projects-grid'), activeProjects = db.projects.filter(p => !p.isArchived);
@@ -1942,9 +2005,9 @@ function generateGroupMessage(monthOffset) {
   const thisM=target.getMonth()+1, thisY=target.getFullYear();
   const monthKey=`${thisY}-${String(thisM).padStart(2,'0')}`;
   const last6Keys=[]; for(let i=5;i>=0;i--){let m=thisM-i,y=thisY;if(m<=0){m+=12;y--;}last6Keys.push(`${y}-${String(m).padStart(2,'0')}`);}
-  const prev5T=db.transactions.filter(t=>t.type==='donation'&&t.date&&last6Keys.slice(0,5).some(k=>t.date.startsWith(k))).reduce((s,t)=>s+t.amount,0);
+  const prev5T=db.transactions.filter(t=>t.type==='donation'&&t.donorId&&t.donorId!=='general'&&t.date&&last6Keys.slice(0,5).some(k=>t.date.startsWith(k))).reduce((s,t)=>s+t.amount,0);
   const avg5=prev5T/5;
-  const thisTxns=db.transactions.filter(t=>t.type==='donation'&&t.date&&t.date.startsWith(monthKey));
+  const thisTxns=db.transactions.filter(t=>t.type==='donation'&&t.donorId&&t.donorId!=='general'&&t.date&&t.date.startsWith(monthKey));
   const thisTotal=thisTxns.reduce((s,t)=>s+t.amount,0);
   const paidIds=new Set(thisTxns.filter(t=>t.donorId&&t.donorId!=='general').map(t=>String(t.donorId)));
   const paidCodes=[...paidIds].map(id=>db.donors.find(d=>String(d.id)===id)?.code||'?').sort();
