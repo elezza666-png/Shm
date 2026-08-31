@@ -1415,8 +1415,7 @@ function exportStatementImage(){
   const opening=selectedProject.openingBalance||0; let runBal=opening;
   const allRows=allTxns.map(t=>{
     const isIn=t.type==='donation'; if(isIn)runBal+=t.amount;else runBal-=t.amount;
-    let displayDesc = getPrivacyDesc(t) + (t.notes?' — '+t.notes:'');
-    return {date:formatDate(t.date), desc: displayDesc, inAmt:isIn?t.amount:0, outAmt:!isIn?t.amount:0, balance:runBal, type:t.type};
+    return {date:formatDate(t.date), desc: getPrivacyDesc(t), notes: t.notes||'', inAmt:isIn?t.amount:0, outAmt:!isIn?t.amount:0, balance:runBal, type:t.type};
   });
 
   const totalIn=allTxns.filter(t=>t.type==='donation').reduce((s,t)=>s+t.amount,0), totalOut=allTxns.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0), finalBal=opening+totalIn-totalOut;
@@ -1426,10 +1425,12 @@ function exportStatementImage(){
   const filterLabel = filterType==='donation' ? ' — الإيرادات فقط' : filterType==='expense' ? ' — المصروفات فقط' : '';
   const MAX_ROWS=20; const displayRows=rows.slice(-MAX_ROWS); // من الأقدم للأحدث (من فوق لتحت) زي الأصل
 
-  const DPR=2, W=1200, ROW_H=65, HEADER_H=300;
+  const DPR=2, W=1200, BASE_ROW_H=65, NOTE_EXTRA=26, HEADER_H=300;
   const TY = HEADER_H + 80;
+  const rowHeights = displayRows.map(r => r.notes ? BASE_ROW_H+NOTE_EXTRA : BASE_ROW_H);
+  const rowsTotalH = rowHeights.reduce((s,h)=>s+h,0);
   // حساب نهاية المحتوى الفعلية أولاً عشان نحدد ارتفاع الكانفاس صح ونمنع أي تراكب مع الفوتر
-  const lastRowBottom = displayRows.length ? (TY + 80 + (displayRows.length-1)*ROW_H + 40) : (TY + 120 + 40);
+  const lastRowBottom = displayRows.length ? (TY + 80 + rowsTotalH) : (TY + 120 + 40);
   const footerY = lastRowBottom + 55;
   const H = footerY + 35;
 
@@ -1451,13 +1452,21 @@ function exportStatementImage(){
   if(displayRows.length === 0) {
       ctx.textAlign='center'; ctx.fillStyle='#888'; ctx.font='bold 28px Cairo,Arial'; ctx.fillText('لا توجد حركات لعرضها', W/2, TY + 120);
   } else {
+      let ry = TY + 80;
       displayRows.forEach((r,i)=>{
-        const ry = TY + 80 + (i*ROW_H);
-        if(i % 2 === 0) { ctx.fillStyle = '#ffffff'; ctx.fillRect(40, ry-25, W-80, ROW_H); }
+        const rh = rowHeights[i];
+        if(i % 2 === 0) { ctx.fillStyle = '#ffffff'; ctx.fillRect(40, ry-25, W-80, rh); }
+        const midY = r.notes ? ry-25+BASE_ROW_H/2+7 : ry+15;
         ctx.fillStyle='#333'; ctx.font='bold 22px Cairo,Arial'; 
-        ctx.textAlign='right'; ctx.fillText(r.date, colX[0], ry+15);
-        let desc = r.desc; if(desc.length > 45) desc = desc.substring(0,45)+'...'; ctx.fillText(desc, colX[1], ry+15);
-        ctx.textAlign='left'; ctx.fillStyle='#27ae60'; ctx.fillText(r.inAmt?r.inAmt.toLocaleString('ar-EG'):'-', colX[2], ry+15); ctx.fillStyle='#c0392b'; ctx.fillText(r.outAmt?r.outAmt.toLocaleString('ar-EG'):'-', colX[3], ry+15); ctx.fillStyle= r.balance>=0 ? '#1a5c38' : '#c0392b'; ctx.font='bold 24px Cairo,Arial'; ctx.fillText(r.balance.toLocaleString('ar-EG'), colX[4], ry+15);
+        ctx.textAlign='right'; ctx.fillText(r.date, colX[0], midY);
+        let desc = r.desc; if(desc.length > 45) desc = desc.substring(0,45)+'...'; ctx.fillText(desc, colX[1], midY);
+        if(r.notes){
+          ctx.fillStyle='#8a9a8a'; ctx.font='italic 16px Cairo,Arial'; ctx.textAlign='right';
+          let noteTxt = '📝 '+r.notes; if(noteTxt.length>50) noteTxt=noteTxt.substring(0,50)+'...';
+          ctx.fillText(noteTxt, colX[1], midY+24);
+        }
+        ctx.textAlign='left'; ctx.fillStyle='#27ae60'; ctx.font='bold 22px Cairo,Arial'; ctx.fillText(r.inAmt?r.inAmt.toLocaleString('ar-EG'):'-', colX[2], midY); ctx.fillStyle='#c0392b'; ctx.fillText(r.outAmt?r.outAmt.toLocaleString('ar-EG'):'-', colX[3], midY); ctx.fillStyle= r.balance>=0 ? '#1a5c38' : '#c0392b'; ctx.font='bold 24px Cairo,Arial'; ctx.fillText(r.balance.toLocaleString('ar-EG'), colX[4], midY);
+        ry += rh;
       });
   }
   ctx.textAlign='center'; ctx.fillStyle='#88a888'; ctx.font='bold 18px Cairo,Arial'; ctx.fillText('تم استخراج هذا التقرير آلياً بواسطة نظام إدارة التبرعات 🌿', W/2, footerY);
