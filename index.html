@@ -1835,8 +1835,12 @@ function generateTopDonorsReport() {
     ctx.fillStyle='#8a9a8a'; ctx.font='17px Cairo,Arial';
     ctx.fillText(txCount+' مرة  |  '+Math.round(pct*100)+'% من الإجمالي',W-M-22,y+66);
 
+    // المبلغ (منطقة مستقلة يسار الشريط تمامًا — بدون أي تراكب معه)
+    ctx.textAlign='right'; ctx.fillStyle=sColor; ctx.font='bold 23px Cairo,Arial';
+    ctx.fillText(item.total.toLocaleString('ar-EG')+' ج',M+235,y+CARD/2+8);
+
     // شريط التقدم
-    const barL=M+90, barTW=W-M*2-310;
+    const barL=M+250, barTW=W-M*2-380-210;
     const barFilledW=Math.max(Math.round(barTW*pct),8);
     const barY=y+CARD/2-10;
     ctx.fillStyle='#e0ece0'; roundRect(ctx,barL,barY,barTW,22,11); ctx.fill();
@@ -1847,10 +1851,6 @@ function generateTopDonorsReport() {
       ctx.fillStyle='white'; ctx.font='bold 14px Cairo,Arial'; ctx.textAlign='center';
       ctx.fillText(Math.round(pct*100)+'%',barL+barFilledW/2,barY+16);
     }
-
-    // المبلغ
-    ctx.textAlign='left'; ctx.fillStyle=sColor; ctx.font='bold 30px Cairo,Arial';
-    ctx.fillText(item.total.toLocaleString('ar-EG')+' ج',M+90,y+CARD/2+10);
 
     y+=CARD+GAP;
   });
