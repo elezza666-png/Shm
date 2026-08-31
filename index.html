@@ -534,15 +534,21 @@
   </div>
   <div class="card" style="border: 2px dashed var(--primary-light); background: #f9fcf9;">
     <div class="card-title" style="color: var(--primary-dark);">🛡️ النسخ الاحتياطي وإدارة البيانات</div>
-    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">يمكنك الاحتفاظ بنسخة لاسترجاعها لاحقاً، أو تصدير البيانات إلى Excel للمراجعة.</p>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">النسخة دي بتشمل كل بيانات البرنامج بلا استثناء (المتبرعين، المشاريع، الحركات، المستفيدين، القرض الحسن) — احتفظي بيها في مكان آمن دوريًا.</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
-      <button class="btn btn-primary" onclick="exportDataToJSON()">⬇️ تحميل نسخة احتياطية (JSON)</button>
+      <button class="btn btn-primary" onclick="exportDataToJSON()">⬇️ تحميل نسخة احتياطية كاملة (JSON)</button>
       <button class="btn btn-outline" onclick="document.getElementById('import-file').click()">⬆️ استرجاع بيانات</button>
       <input type="file" id="import-file" style="display:none" accept=".json" onchange="importDataFromJSON(event)">
     </div>
     <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
         <button class="btn btn-success" onclick="exportToExcel()">📊 تصدير قاعدة البيانات (Excel / CSV)</button>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🕐 نسخ تلقائية محفوظة على هذا الجهاز</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">البرنامج بياخد نسخة تلقائية من كل البيانات أول مرة تفتحيه فيها كل يوم، ويحتفظ بآخر 7 أيام. دي شبكة أمان إضافية، لكن التحميل اليدوي فوق برضه أضمن (بيحفظ برة الجهاز).</p>
+    <div id="local-snapshots-list"><div class="empty" style="padding:20px;">جاري التحميل...</div></div>
   </div>
 </div>
 
@@ -822,6 +828,7 @@ function _initFB() {
 
 async function saveDB() {
   try { localStorage.setItem('charity_db_v5', JSON.stringify(db)); } catch(e){}
+  rotateLocalSnapshots();
   renderAll();
   if(!fbInitialized || typeof firebase==='undefined') return;
   setPending(+1);
@@ -839,10 +846,65 @@ async function saveDB() {
   }
 }
 
+// ============================================================
+// 🕐 نسخ احتياطية تلقائية يومية على الجهاز (شبكة أمان إضافية)
+// نسخة واحدة فقط لأول حفظ في كل يوم، والاحتفاظ بآخر 7 أيام فقط
+// ============================================================
+function rotateLocalSnapshots(){
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const snapKey = 'charity_db_snapshot_' + today;
+    if(!localStorage.getItem(snapKey)){
+      localStorage.setItem(snapKey, JSON.stringify(db));
+      const KEEP = 7;
+      const allKeys = Object.keys(localStorage).filter(k=>k.startsWith('charity_db_snapshot_')).sort();
+      while(allKeys.length > KEEP){ localStorage.removeItem(allKeys.shift()); }
+    }
+  } catch(e){}
+}
+
+function renderLocalSnapshots(){
+  const container = document.getElementById('local-snapshots-list');
+  if(!container) return;
+  const keys = Object.keys(localStorage).filter(k=>k.startsWith('charity_db_snapshot_')).sort().reverse();
+  if(!keys.length){ container.innerHTML = '<div class="empty" style="padding:20px;"><div class="empty-text">لا توجد نسخ تلقائية بعد — هتظهر هنا تلقائيًا</div></div>'; return; }
+  container.innerHTML = keys.map(k=>{
+    const date = k.replace('charity_db_snapshot_','');
+    let counts = '';
+    try { const d = JSON.parse(localStorage.getItem(k)); counts = `${(d.donors||[]).length} متبرع، ${(d.beneficiaries||[]).length} مستفيد، ${(d.transactions||[]).length} حركة`; } catch(e){}
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px;">
+      <div><strong>📅 ${date}</strong><br><small style="color:#888;">${counts}</small></div>
+      <button class="btn btn-outline btn-sm" onclick="restoreLocalSnapshot('${k}')">↩️ استعادة هذه النسخة</button>
+    </div>`;
+  }).join('');
+}
+
+async function restoreLocalSnapshot(key){
+  const date = key.replace('charity_db_snapshot_','');
+  if(!confirm('⚠️ سيتم استبدال كل البيانات الحالية (في كل الأجهزة المتصلة) بنسخة يوم '+date+'. هذا الإجراء لا يمكن التراجع عنه. متأكد؟')) return;
+  try {
+    const snap = localStorage.getItem(key);
+    if(!snap) return toast('⚠️ النسخة غير موجودة','error');
+    db = JSON.parse(snap);
+    await saveDB();
+    toast('✅ تم الاسترجاع من نسخة يوم '+date, 'success');
+  } catch(e){ toast('❌ فشل الاسترجاع، الملف تالف','error'); }
+}
+
 // ===== التصدير والإستيراد =====
 function exportDataToJSON() {
   const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
   const link = document.createElement('a'); link.href = dataStr; link.download = `Backup_${new Date().toISOString().split('T')[0]}.json`; link.click();
+  try { localStorage.setItem('charity_last_manual_backup', new Date().toISOString().split('T')[0]); } catch(e){}
+}
+function checkBackupReminder(){
+  try {
+    const last = localStorage.getItem('charity_last_manual_backup');
+    const days = last ? Math.floor((Date.now()-new Date(last).getTime())/86400000) : Infinity;
+    if(days >= 14){
+      toast('💡 نصيحة: لم تُحمَّل نسخة احتياطية كاملة منذ ' + (last?days+' يوم':'أبداً') + ' — من الإعدادات ⚙️', '');
+    }
+  } catch(e){}
 }
 function importDataFromJSON(event) {
   const file = event.target.files[0]; if (!file) return;
@@ -891,6 +953,7 @@ function showPage(id) {
     document.querySelectorAll('.nav-btn')[idx].classList.add('active');
   if(id==='home')         renderHomePage();
   if(id==='beneficiaries') renderBeneficiariesPage();
+  if(id==='settings') renderLocalSnapshots();
   if(id==='projects') renderProjectsTable();
   if(id==='donors')   renderDonorsTable();
   if(id==='qard') {
@@ -2673,7 +2736,7 @@ async function safeClick(btn, fn) {
   finally { unlockBtn(btn); }
 }
 
-window.onload = loadDB;
+window.onload = function(){ loadDB(); setTimeout(checkBackupReminder, 2500); };
 </script>
 </body>
 </html>
