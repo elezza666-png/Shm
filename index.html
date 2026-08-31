@@ -1402,7 +1402,11 @@ function exportStatementPDF() {
 // 9. رسم الكانفاس (الصور)
 // ==========================================
 function roundRect(ctx, x, y, width, height, radius) {
-  ctx.beginPath(); ctx.moveTo(x + radius, y); ctx.lineTo(x + width - radius, y); ctx.quadraticCurveTo(x + width, y, x + width, y + radius); ctx.lineTo(x + width, y + height - radius); ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height); ctx.lineTo(x + radius, y + height); ctx.quadraticCurveTo(x, y + height, x, y + height - radius); ctx.lineTo(x, y + radius); ctx.quadraticCurveTo(x, y, x + radius, y); ctx.closePath();
+  // يدعم رقم واحد لكل الزوايا (شكل قديم) أو كائن {tl,tr,bl,br} لكل زاوية بمفردها
+  let r;
+  if (typeof radius === 'number') { r = {tl:radius, tr:radius, br:radius, bl:radius}; }
+  else { r = Object.assign({tl:0,tr:0,br:0,bl:0}, radius||{}); }
+  ctx.beginPath(); ctx.moveTo(x + r.tl, y); ctx.lineTo(x + width - r.tr, y); ctx.quadraticCurveTo(x + width, y, x + width, y + r.tr); ctx.lineTo(x + width, y + height - r.br); ctx.quadraticCurveTo(x + width, y + height, x + width - r.br, y + height); ctx.lineTo(x + r.bl, y + height); ctx.quadraticCurveTo(x, y + height, x, y + height - r.bl); ctx.lineTo(x, y + r.tl); ctx.quadraticCurveTo(x, y, x + r.tl, y); ctx.closePath();
 }
 
 function exportStatementImage(){
