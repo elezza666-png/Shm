@@ -220,11 +220,8 @@
     <div class="strip-card"><div class="num" id="sum-total">0</div><div class="lbl">إجمالي التبرعات (ج)</div></div>
   </div>
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-      <div class="card-title" style="margin:0;">🎯 اختر مشروعاً للعمل عليه</div>
-      <button id="home-share-updates-btn" class="btn btn-accent btn-sm" style="display:none;" onclick="exportActiveFundsUpdateImage()">📢 مشاركة تحديثات الصناديق</button>
-    </div>
-    <p style="font-size:12px;color:var(--text-muted);margin:6px 0 12px;">🆕 = صندوق فيه حركات جديدة لسه ما اتشاركتش</p>
+    <div class="card-title">🎯 اختر مشروعاً للعمل عليه</div>
+    <p style="font-size:12px;color:var(--text-muted);margin:6px 0 12px;">🆕 = صندوق فيه حركات جديدة لسه ما اتشاركتش كشف حسابها</p>
     <div class="projects-grid" id="home-projects-grid"><div class="empty"><div class="empty-icon">⏳</div><div class="empty-text">جاري التحميل...</div></div></div>
   </div>
   
@@ -1161,46 +1158,6 @@ async function saveEditProject(){
 async function deleteProject(id){ if(!confirm('حذف نهائي للمشروع؟'))return; db.projects=db.projects.filter(p=>p.id!==id); db.transactions=db.transactions.filter(t=>t.projectId!==id); if(selectedProject&&selectedProject.id===id){selectedProject=null; document.getElementById('project-actions').style.display='none';} await saveDB(); toast('🗑️ تم الحذف', 'success'); }
 async function toggleArchiveProject(id) { const p=db.projects.find(x=>x.id===id); if(!p)return; p.isArchived = !p.isArchived; if(p.isArchived && selectedProject && selectedProject.id===id){ selectedProject=null; document.getElementById('project-actions').style.display='none'; } await saveDB(); toast(p.isArchived ? '📦 تم أرشفة المشروع' : '🔄 تم استرجاع المشروع', 'success'); }
 
-// تقرير "تحديثات الصناديق" — الصناديق الغير خاصة اللي حصل فيها تعاملات جديدة منذ آخر مشاركة
-// بمجرد توليد التقرير، يتصفّر عداد كل صندوق ظهر فيه (يبدأ العد من جديد)
-async function exportActiveFundsUpdateImage() {
-  const updated = db.projects.filter(p => !p.isArchived && !p.isPrivate && getNewTxnCount(p.id) > 0);
-  if(!updated.length) return toast('⚠️ لا توجد صناديق بها تحديثات جديدة منذ آخر مشاركة', 'error');
-
-  const rows = updated.map(p => ({ name: p.name, count: getNewTxnCount(p.id), bal: getProjectBalance(p.id) }));
-
-  const DPR=2, W=1100, HEADER_H=200, CARD_H=90, ROW_GAP=18, MARGIN=60;
-  const H = HEADER_H + (rows.length * (CARD_H + ROW_GAP)) + 140;
-  const cvs=document.getElementById('export-canvas'); cvs.width=W*DPR; cvs.height=H*DPR; const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
-
-  ctx.fillStyle='#f0f4f0'; ctx.fillRect(0,0,W,H);
-  const gH=ctx.createLinearGradient(0,0,W,HEADER_H); gH.addColorStop(0,'#0a2e1a'); gH.addColorStop(1,'#2d8a56');
-  ctx.fillStyle=gH; ctx.fillRect(0,0,W,HEADER_H);
-  ctx.textAlign='center'; ctx.fillStyle='white'; ctx.font='bold 44px Cairo,Arial'; ctx.fillText('📢 تحديثات الصناديق', W/2, 90);
-  ctx.fillStyle='#ffd166'; ctx.font='bold 20px Cairo,Arial'; ctx.fillText('صناديق حصل فيها تعاملات جديدة — تابعوها معنا 🌿', W/2, 135);
-  ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='16px Cairo,Arial'; ctx.fillText(new Date().toLocaleDateString('ar-EG'), W/2, 165);
-
-  let y = HEADER_H + 30;
-  rows.forEach(r=>{
-    ctx.shadowColor='rgba(0,0,0,0.08)'; ctx.shadowBlur=14; ctx.shadowOffsetY=6;
-    ctx.fillStyle='white'; ctx.beginPath(); ctx.roundRect(MARGIN, y, W-MARGIN*2, CARD_H, 14); ctx.fill();
-    ctx.shadowColor='transparent';
-    ctx.textAlign='right'; ctx.fillStyle='#0f3d25'; ctx.font='bold 26px Cairo,Arial'; ctx.fillText(r.name, W-MARGIN-25, y+38);
-    ctx.fillStyle='#5a7a5a'; ctx.font='16px Cairo,Arial'; ctx.fillText('الرصيد الحالي: ' + r.bal.toLocaleString('ar-EG') + ' ج', W-MARGIN-25, y+66);
-    ctx.textAlign='left'; ctx.fillStyle='#c0392b'; ctx.font='bold 22px Cairo,Arial'; ctx.fillText('🆕 ' + r.count + ' حركة جديدة', MARGIN+25, y+CARD_H/2+8);
-    y += CARD_H + ROW_GAP;
-  });
-
-  ctx.textAlign='center'; ctx.fillStyle='#88a888'; ctx.font='bold 17px Cairo,Arial';
-  ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿  —  جزاكم الله خيراً', W/2, y+30);
-
-  openReportModal([{url: cvs.toDataURL('image/png'), name: 'تحديثات_الصناديق.png'}]);
-
-  // تصفير عداد كل صندوق ظهر في هذا التقرير
-  updated.forEach(p => { p.lastSharedTxnCount = db.transactions.filter(t=>t.projectId===p.id).length; });
-  await saveDB();
-}
-
 function renderProjectsTable(){
   // migration: أي مشروع قديم من غير عداد مشاركة، نبدأ عداده من صفر (من دلوقتي فصاعداً) بدل ما تظهر كل حركاته القديمة كـ"جديدة"
   let migrated=false;
@@ -1254,8 +1211,6 @@ function renderHomePage() {
   const totalDon = db.transactions.filter(t=>t.type==='donation'&&!_pvtHome.has(t.projectId)).reduce((s,t)=>s+t.amount,0);
   const publicActive = db.projects.filter(p=>!p.isArchived&&!p.isPrivate);
   document.getElementById('sum-donors').textContent=db.donors.length; document.getElementById('sum-projects').textContent=publicActive.length; document.getElementById('sum-total').textContent=totalDon.toLocaleString('ar-EG');
-  const shareBtn = document.getElementById('home-share-updates-btn');
-  if(shareBtn){ const anyNew = publicActive.some(p=>getNewTxnCount(p.id)>0); shareBtn.style.display = anyNew ? 'inline-block' : 'none'; }
 }
 function selectProject(id) { selectedProject = db.projects.find(p=>p.id===id); document.getElementById('project-actions').style.display='block'; renderHomePage(); populateDonorSelect('don-donor'); document.getElementById('tab-donation').click(); }
 
@@ -1479,7 +1434,7 @@ function roundRect(ctx, x, y, width, height, radius) {
   ctx.beginPath(); ctx.moveTo(x + r.tl, y); ctx.lineTo(x + width - r.tr, y); ctx.quadraticCurveTo(x + width, y, x + width, y + r.tr); ctx.lineTo(x + width, y + height - r.br); ctx.quadraticCurveTo(x + width, y + height, x + width - r.br, y + height); ctx.lineTo(x + r.bl, y + height); ctx.quadraticCurveTo(x, y + height, x, y + height - r.bl); ctx.lineTo(x, y + r.tl); ctx.quadraticCurveTo(x, y, x + r.tl, y); ctx.closePath();
 }
 
-function exportStatementImage(){
+async function exportStatementImage(){
   if(!selectedProject) return toast('⚠️ اختر مشروعاً','error');
   const allTxns=db.transactions.filter(t=>t.projectId===selectedProject.id).sort((a,b)=>new Date(a.date)-new Date(b.date));
   const opening=selectedProject.openingBalance||0; let runBal=opening;
@@ -1543,6 +1498,10 @@ function exportStatementImage(){
   
   const filterSuffix = filterType==='donation' ? '_إيرادات' : filterType==='expense' ? '_مصروفات' : '';
   openReportModal([{url: cvs.toDataURL('image/png'), name: 'كشف_حساب_'+selectedProject.name+filterSuffix+'.png'}]);
+
+  // تصفير عداد "الحركات الجديدة" لهذا الصندوق فقط، لحظة مشاركة كشف حسابه
+  selectedProject.lastSharedTxnCount = db.transactions.filter(t=>t.projectId===selectedProject.id).length;
+  await saveDB();
 }
 
 function exportActiveProjectsImage() {
