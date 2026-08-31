@@ -1983,7 +1983,8 @@ function drawDonorCard(donorId) {
 
   const txns = db.transactions.filter(t => t.type==='donation' && String(t.donorId)===String(donorId)).sort((a,b)=>new Date(a.date)-new Date(b.date));
   const total = txns.reduce((s,t)=>s+t.amount,0);
-  const overallTotal = db.transactions.filter(t=>t.type==='donation').reduce((s,t)=>s+t.amount,0);
+  // نسبة المساهمة: من إجمالي مساهمات المساهمين المسجلين فقط، بدون التبرع العام (نفس القاعدة في كل التقارير)
+  const overallTotal = db.transactions.filter(t=>t.type==='donation' && t.donorId && t.donorId!=='general').reduce((s,t)=>s+t.amount,0);
   const pct = overallTotal>0?Math.round(total/overallTotal*100):0;
   const count = txns.length;
   const firstDate = txns.length ? txns[0].date : '';
@@ -2021,7 +2022,7 @@ function drawDonorCard(donorId) {
   const cW=(W-80)/3;
   [{icon:'💰',label:'إجمالي المساهمات',val:total.toLocaleString('ar-EG')+' ج',c:'#1a5c38'},
    {icon:'🔢',label:'عدد المساهمات',val:count+' مرة',c:'#2980b9'},
-   {icon:'📊',label:'نسبته من الإجمالي',val:pct+'%',c:'#f0a500'}].forEach((c,i)=>{
+   {icon:'📊',label:'نسبته من المساهمين',val:pct+'%',c:'#f0a500'}].forEach((c,i)=>{
     const cx=40+i*(cW+10);
     ctx.fillStyle='#f4faf5'; roundRect(ctx,cx,214,cW,94,12); ctx.fill();
     ctx.font='26px Arial'; ctx.textAlign='center'; ctx.fillText(c.icon,cx+cW/2,248);
@@ -2060,11 +2061,14 @@ function drawDonorCard(donorId) {
     const maxP=topP[0].amt;
     topP.forEach((p,i)=>{
       const py=668+i*48;
-      ctx.fillStyle='#f0f5f1'; roundRect(ctx,40,py,W-80,38,8); ctx.fill();
-      const bw=Math.round((W-140)*(p.amt/maxP)*0.72);
-      ctx.fillStyle='rgba(26,92,56,0.65)'; roundRect(ctx,40,py,bw+50,38,8); ctx.fill();
-      ctx.textAlign='right'; ctx.fillStyle='white'; ctx.font='bold 17px Cairo,Arial'; ctx.fillText(p.name,W-55,py+25);
-      ctx.textAlign='left'; ctx.fillStyle='white'; ctx.fillText(p.amt.toLocaleString('ar-EG')+' ج',55,py+25);
+      const pPct = total>0 ? Math.round(p.amt/total*100) : 0;
+      // خلفية الصف (فاتحة ثابتة) + تظليل خفيف يعكس النسبة، بدون ما يأثر على وضوح النص
+      ctx.fillStyle='#eef4ef'; roundRect(ctx,40,py,W-80,38,8); ctx.fill();
+      const bw=Math.round((W-80)*(p.amt/maxP));
+      ctx.fillStyle='rgba(26,92,56,0.16)'; roundRect(ctx,40,py,Math.max(bw,60),38,8); ctx.fill();
+      // النص دايماً بلون غامق ثابت — واضح فوق أي جزء من الصف (ملوّن أو فاتح)
+      ctx.textAlign='right'; ctx.fillStyle='#0f3d25'; ctx.font='bold 17px Cairo,Arial'; ctx.fillText(p.name,W-55,py+25);
+      ctx.textAlign='left'; ctx.fillStyle='#1a5c38'; ctx.font='bold 16px Cairo,Arial'; ctx.fillText(p.amt.toLocaleString('ar-EG')+' ج ('+pPct+'%)',55,py+25);
     });
   }
 
