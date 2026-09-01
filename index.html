@@ -1212,7 +1212,7 @@ function renderHomePage() {
   const publicActive = db.projects.filter(p=>!p.isArchived&&!p.isPrivate);
   document.getElementById('sum-donors').textContent=db.donors.length; document.getElementById('sum-projects').textContent=publicActive.length; document.getElementById('sum-total').textContent=totalDon.toLocaleString('ar-EG');
 }
-function selectProject(id) { selectedProject = db.projects.find(p=>p.id===id); document.getElementById('project-actions').style.display='block'; renderHomePage(); populateDonorSelect('don-donor'); document.getElementById('tab-donation').click(); }
+function selectProject(id) { selectedProject = db.projects.find(p=>p.id===id); document.getElementById('project-actions').style.display='block'; renderHomePage(); populateDonorSelect('don-donor'); document.getElementById('tab-donation').click(); setTimeout(()=>{ document.getElementById('project-actions').scrollIntoView({behavior:'smooth', block:'start'}); }, 50); }
 
 async function saveDonation(){
   if(!selectedProject) return toast('⚠️ اختر مشروعاً','error');
