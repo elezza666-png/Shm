@@ -561,8 +561,10 @@
     <div id="wa-message-text" style="background:#e8f5e9;border-radius:14px;padding:16px;font-size:13px;line-height:2;white-space:pre-wrap;border:1px solid #c8e6c9;color:#1b5e20;max-height:360px;overflow-y:auto;font-family:Cairo,sans-serif;margin-bottom:4px;"></div>
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" onclick="closeModal('wa-modal')">إغلاق</button>
+      <button class="btn btn-outline" onclick="copyWaMessage()">📋 نسخ الرسالة</button>
       <button class="btn btn-primary" onclick="openWhatsApp()">📲 فتح واتساب وإرسال</button>
     </div>
+    <p style="font-size:11px;color:#888;margin-top:8px;text-align:center;">💡 لو الرموز التعبيرية طلعت مشوّهة بعد فتح واتساب من المتصفح، استخدمي "نسخ الرسالة" والصقيها يدوياً بدل الإرسال المباشر</p>
   </div>
 </div>
 
@@ -1386,6 +1388,20 @@ ${WA_GROUP_LINK}`;
 function openWhatsApp(){ 
   if(!currentWaPhone) return toast('⚠️ لا يوجد رقم هاتف مسجل لهذا المتبرع', 'error');
   window.open('https://wa.me/'+currentWaPhone+'?text='+encodeURIComponent(currentWaMessage),'_blank'); closeModal('wa-modal'); 
+}
+
+async function copyWaMessage(){
+  try {
+    await navigator.clipboard.writeText(currentWaMessage);
+    toast('✅ تم نسخ الرسالة — الصقيها في واتساب', 'success');
+  } catch(e){
+    // بديل احتياطي للمتصفحات اللي ما بتدعمش Clipboard API
+    try {
+      const ta=document.createElement('textarea'); ta.value=currentWaMessage; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+      toast('✅ تم نسخ الرسالة — الصقيها في واتساب', 'success');
+    } catch(e2){ toast('⚠️ تعذر النسخ التلقائي، حددي النص يدوياً وانسخيه', 'error'); }
+  }
 }
 
 // ==========================================
