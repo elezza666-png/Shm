@@ -242,6 +242,7 @@
               <input type="hidden" id="don-donor">
               <div class="custom-select-list" id="don-donor-list"></div>
             </div>
+            <div id="don-last-contribution" style="display:none;margin-top:8px;padding:10px 14px;background:#eef6f0;border-radius:10px;border-right:3px solid #1a5c38;font-size:13px;color:#1a5c38;"></div>
           </div>
           <div class="form-group"><label>المبلغ (جنيه) *</label><input type="number" id="don-amount" placeholder="0.00" min="1"></div>
           <div class="form-group span2" id="don-general-desc-wrapper" style="display:none;">
@@ -1099,22 +1100,42 @@ function openDonorReport(donorId) {
 function renderDonorsTable(){
   const tbody = document.getElementById('donors-table-body');
   if(!db.donors.length) { tbody.innerHTML='<tr><td colspan="5"><div class="empty">لا يوجد متبرعون</div></td></tr>'; return; }
-  tbody.innerHTML = db.donors.map(d=>`<tr><td><span class="badge badge-code">${d.code}</span></td><td><strong>${d.name}</strong><br><small style="color:#777;">${getGenderLabel(d.gender||'M')}</small></td><td dir="ltr">${d.phone || '-'}</td><td>${d.notes||'-'}</td><td style="display:flex;gap:4px;"><button class="btn btn-info btn-sm" style="padding:4px 8px;" onclick="openDonorReport(${d.id})" title="تقرير وتذكير المتبرع">📄</button><button class="btn btn-warn btn-sm" style="padding:4px 8px;" onclick="openEditDonor(${d.id})">✏️</button><button class="btn btn-outline btn-sm" style="padding:4px 8px;" onclick="deleteDonor(${d.id})">🗑️</button></td></tr>`).join('');
+  const threeMonthsAgo = Date.now() - (90*86400000);
+  tbody.innerHTML = db.donors.map(d=>{
+    const donorTxns = db.transactions.filter(t=>t.type==='donation'&&String(t.donorId)===String(d.id)).sort((a,b)=>new Date(b.date)-new Date(a.date));
+    const lastDon = donorTxns[0];
+    const isInactive = !lastDon || new Date(lastDon.date).getTime() < threeMonthsAgo;
+    const inactiveBadge = isInactive ? `<br><span class="badge" style="background:#fdecea;color:#c0392b;margin-top:4px;display:inline-block;">⚠️ ${lastDon?'غايب من '+Math.floor((Date.now()-new Date(lastDon.date).getTime())/2592000000)+' شهر':'لم يتبرع بعد'}</span>` : '';
+    return `<tr><td><span class="badge badge-code">${d.code}</span></td><td><strong>${d.name}</strong><br><small style="color:#777;">${getGenderLabel(d.gender||'M')}</small>${inactiveBadge}</td><td dir="ltr">${d.phone || '-'}</td><td>${d.notes||'-'}</td><td style="display:flex;gap:4px;"><button class="btn btn-info btn-sm" style="padding:4px 8px;" onclick="openDonorReport(${d.id})" title="تقرير وتذكير المتبرع">📄</button><button class="btn btn-warn btn-sm" style="padding:4px 8px;" onclick="openEditDonor(${d.id})">✏️</button><button class="btn btn-outline btn-sm" style="padding:4px 8px;" onclick="deleteDonor(${d.id})">🗑️</button></td></tr>`;
+  }).join('');
   if(!document.getElementById('new-donor-code').value) document.getElementById('new-donor-code').value = generateNextCode();
   filterDonorsTable();
+}
+
+function showLastContributionInfo(donorId){
+  const box = document.getElementById('don-last-contribution'); if(!box) return;
+  const txns = db.transactions.filter(t=>t.type==='donation'&&String(t.donorId)===String(donorId)).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  if(!txns.length){ box.style.display='block'; box.innerHTML='🆕 أول مساهمة لهذا المتبرع في النظام'; return; }
+  const last = txns[0];
+  const proj = db.projects.find(p=>String(p.id)===String(last.projectId));
+  const daysAgo = Math.floor((Date.now()-new Date(last.date).getTime())/86400000);
+  const whenTxt = daysAgo<=0 ? 'اليوم' : daysAgo===1 ? 'أمس' : `منذ ${daysAgo} يوم`;
+  box.style.display='block';
+  box.innerHTML = `💚 آخر مساهمة: <strong>${last.amount.toLocaleString('ar-EG')} ج</strong> في <strong>${proj?proj.name:'مشروع محذوف'}</strong> — ${formatDate(last.date)} (${whenTxt}) · إجمالي مساهماته: ${txns.length} مرة`;
 }
 
 function populateDonorSelect(elementId) {
   if(elementId === 'don-donor') {
     const list = document.getElementById('don-donor-list'); if(!list) return; list.innerHTML = '';
     document.getElementById('don-donor-search').value = ''; document.getElementById('don-donor').value = '';
+    const lastBox = document.getElementById('don-last-contribution'); if(lastBox) lastBox.style.display='none';
     const genDiv = document.createElement('div'); genDiv.className = 'custom-select-item special'; genDiv.textContent = '🌟 إيراد عام / فاعل خير (بدون تسجيل)';
-    genDiv.onclick = () => { document.getElementById('don-donor-search').value = '🌟 إيراد عام / فاعل خير'; document.getElementById('don-donor').value = 'general'; document.getElementById('don-general-desc-wrapper').style.display = 'block'; list.classList.remove('show'); };
+    genDiv.onclick = () => { document.getElementById('don-donor-search').value = '🌟 إيراد عام / فاعل خير'; document.getElementById('don-donor').value = 'general'; document.getElementById('don-general-desc-wrapper').style.display = 'block'; document.getElementById('don-last-contribution').style.display='none'; list.classList.remove('show'); };
     list.appendChild(genDiv);
     if(db.donors.length) {
         db.donors.forEach(d => {
           const div = document.createElement('div'); div.className = 'custom-select-item'; div.textContent = `${d.name} (${d.code})`;
-          div.onclick = () => { document.getElementById('don-donor-search').value = `${d.name} (${d.code})`; document.getElementById('don-donor').value = d.id; document.getElementById('don-general-desc-wrapper').style.display = 'none'; list.classList.remove('show'); };
+          div.onclick = () => { document.getElementById('don-donor-search').value = `${d.name} (${d.code})`; document.getElementById('don-donor').value = d.id; document.getElementById('don-general-desc-wrapper').style.display = 'none'; showLastContributionInfo(d.id); list.classList.remove('show'); };
           list.appendChild(div);
         });
     }
@@ -1124,7 +1145,7 @@ function populateDonorSelect(elementId) {
   }
 }
 document.getElementById('don-donor-search').addEventListener('input', function(e) {
-  const filter = e.target.value.toLowerCase(), list = document.getElementById('don-donor-list'); list.classList.add('show'); document.getElementById('don-donor').value = ''; document.getElementById('don-general-desc-wrapper').style.display = 'none';
+  const filter = e.target.value.toLowerCase(), list = document.getElementById('don-donor-list'); list.classList.add('show'); document.getElementById('don-donor').value = ''; document.getElementById('don-general-desc-wrapper').style.display = 'none'; document.getElementById('don-last-contribution').style.display='none';
   const items = list.getElementsByClassName('custom-select-item'); let hasVisible = false;
   for (let i = 0; i < items.length; i++) { const txt = items[i].textContent; if (txt.toLowerCase().indexOf(filter) > -1) { items[i].style.display = ""; hasVisible = true; } else { items[i].style.display = "none"; } }
   const emptyMsg = list.querySelector('.custom-select-empty'); if(emptyMsg) emptyMsg.remove();
@@ -1231,7 +1252,8 @@ async function saveDonation(){
   db.transactions.push(tx); await saveDB();
   
   document.getElementById('don-amount').value=''; document.getElementById('don-notes').value=''; document.getElementById('don-general-desc').value=''; document.getElementById('don-general-desc-wrapper').style.display='none';
-  document.getElementById('don-donor-search').value = ''; document.getElementById('don-donor').value = ''; toast('✅ تم التسجيل','success');
+  document.getElementById('don-donor-search').value = ''; document.getElementById('don-donor').value = ''; document.getElementById('don-date').value = new Date().toISOString().split('T')[0]; toast('✅ تم التسجيل','success');
+  document.getElementById('don-last-contribution').style.display='none';
   if(parsedDonorId !== 'general') { 
     const donor = db.donors.find(d=>d.id===parsedDonorId); 
     const savedTxId = tx.id;
@@ -1256,6 +1278,7 @@ async function saveExpense(){
   db.transactions.push({id:Date.now(), type:'expense', projectId:selectedProject.id, amount, date, notes, desc, beneficiaryId}); await saveDB();
   document.getElementById('exp-desc').value=''; document.getElementById('exp-amount').value=''; document.getElementById('exp-notes').value='';
   document.getElementById('exp-beneficiary').value=''; toggleExpDescRequired();
+  document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
   toast('✅ تم تسجيل المصروف','success');
 }
 
