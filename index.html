@@ -412,37 +412,32 @@
 
 <!-- QARD HASSAN PAGE -->
 <div class="page" id="page-monthly">
-  <div class="page-title"><div class="page-title-text">🔁 التبرعات الشهرية</div></div>
+  <div class="page-title"><div class="page-title-text">🔁 المصروفات الشهرية</div></div>
 
   <div class="summary-strip">
-    <div class="strip-card"><div class="num" id="monthly-count">0</div><div class="lbl">👥 عدد الالتزامات</div></div>
-    <div class="strip-card"><div class="num" id="monthly-total">0</div><div class="lbl">💰 إجمالي شهري (ج)</div></div>
+    <div class="strip-card"><div class="num" id="monthly-count">0</div><div class="lbl">📋 عدد المصروفات</div></div>
+    <div class="strip-card"><div class="num" id="monthly-total">0</div><div class="lbl">💸 إجمالي شهري (ج)</div></div>
     <div class="strip-card"><div class="num" id="monthly-due" style="color:var(--danger)">0</div><div class="lbl">⏰ مستحق الآن</div></div>
   </div>
 
   <div class="card">
-    <div class="card-title">➕ تسجيل تبرع شهري جديد</div>
+    <div class="card-title">➕ تسجيل مصروف شهري جديد</div>
     <div class="form-grid">
-      <div class="form-group"><label>المتبرع *</label>
-        <div class="custom-select" id="mon-donor-box">
-          <input type="text" id="mon-donor-search" class="custom-select-input" placeholder="ابحث بالاسم أو الكود..." autocomplete="off">
-          <input type="hidden" id="mon-donor-id">
-          <div class="custom-select-list" id="mon-donor-list"></div>
-        </div>
-      </div>
+      <div class="form-group"><label>🏠 المستفيد (اختياري)</label><select id="mon-beneficiary"><option value="">-- بدون مستفيد --</option></select></div>
+      <div class="form-group"><label>البيان <small style="color:var(--text-muted);">(مطلوب لو مفيش مستفيد)</small></label><input type="text" id="mon-desc" placeholder="وصف المصروف"></div>
       <div class="form-group"><label>المبلغ (جنيه) *</label><input type="number" id="mon-amount" placeholder="0.00" min="1"></div>
       <div class="form-group"><label>تاريخ الاستحقاق *</label><input type="date" id="mon-date"></div>
-      <div class="form-group"><label>الصندوق *</label><select id="mon-project"></select></div>
+      <div class="form-group span2"><label>الصندوق اللي هيتسحب منه المبلغ *</label><select id="mon-project"></select></div>
       <div class="form-group span2"><label>ملاحظات</label><input type="text" id="mon-notes" placeholder="اختياري"></div>
     </div>
     <div style="margin-top:14px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="safeClick(this, saveMonthly)">➕ إضافة</button></div>
   </div>
 
   <div class="card" style="padding:0;">
-    <div style="padding:16px;"><div class="card-title" style="margin:0;">📋 جدول التبرعات الشهرية <small style="color:var(--text-muted);font-weight:600;">(الأقدم استحقاقاً فوق)</small></div></div>
+    <div style="padding:16px;"><div class="card-title" style="margin:0;">📋 جدول المصروفات الشهرية <small style="color:var(--text-muted);font-weight:600;">(الأقدم استحقاقاً فوق)</small></div></div>
     <div class="table-wrap" style="border:none;border-top:1px solid var(--border);border-radius:0 0 16px 16px;">
       <table>
-        <thead><tr><th>الاستحقاق</th><th>المتبرع</th><th>المبلغ</th><th>الصندوق</th><th>إجراء</th></tr></thead>
+        <thead><tr><th>الاستحقاق</th><th>البيان / المستفيد</th><th>المبلغ</th><th>الصندوق</th><th>إجراء</th></tr></thead>
         <tbody id="monthly-body"></tbody>
       </table>
     </div>
@@ -513,16 +508,17 @@
 <!-- MONTHLY PAY MODAL -->
 <div class="modal-overlay" id="mon-pay-modal">
   <div class="modal">
-    <div class="modal-title">✅ تسجيل دفع التبرع الشهري</div>
+    <div class="modal-title">✅ تسجيل صرف المصروف الشهري</div>
     <input type="hidden" id="mon-pay-id">
     <div id="mon-pay-info" style="background:#e8f5e9;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.8;"></div>
-    <div class="form-group" style="margin-bottom:12px;"><label>المبلغ (جنيه) *</label><input type="number" id="mon-pay-amount" min="1"></div>
-    <div class="form-group" style="margin-bottom:12px;"><label>تاريخ الدفع *</label><input type="date" id="mon-pay-date"></div>
-    <div class="form-group" style="margin-bottom:6px;"><label>الصندوق *</label><select id="mon-pay-project"></select></div>
-    <p style="font-size:11px;color:#888;margin-bottom:14px;">💡 تغيير الصندوق هنا يخص هذه الدفعة فقط. للتغيير الدائم استخدمي زر ✏️ التعديل.</p>
+    <div class="form-group" style="margin-bottom:12px;"><label>المبلغ (جنيه) *</label><input type="number" id="mon-pay-amount" min="1" oninput="updateMonPayBalance()"></div>
+    <div class="form-group" style="margin-bottom:12px;"><label>تاريخ الصرف *</label><input type="date" id="mon-pay-date"></div>
+    <div class="form-group" style="margin-bottom:6px;"><label>الصندوق اللي هيتسحب منه *</label><select id="mon-pay-project" onchange="updateMonPayBalance()"></select></div>
+    <div id="mon-pay-balance" style="font-size:12px;margin-bottom:6px;"></div>
+    <p style="font-size:11px;color:#888;margin-bottom:14px;">💡 تغيير الصندوق هنا يخص هذا الصرف فقط. للتغيير الدائم استخدمي زر ✏️ التعديل.</p>
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" onclick="closeModal('mon-pay-modal')">إلغاء</button>
-      <button class="btn btn-primary" onclick="safeClick(this, confirmPayMonthly)">✅ تأكيد الدفع</button>
+      <button class="btn btn-primary" onclick="safeClick(this, confirmPayMonthly)">✅ تأكيد الصرف</button>
     </div>
   </div>
 </div>
@@ -530,18 +526,13 @@
 <!-- MONTHLY EDIT MODAL -->
 <div class="modal-overlay" id="mon-edit-modal">
   <div class="modal">
-    <div class="modal-title">✏️ تعديل التبرع الشهري</div>
+    <div class="modal-title">✏️ تعديل المصروف الشهري</div>
     <input type="hidden" id="mon-edit-id">
-    <div class="form-group" style="margin-bottom:12px;"><label>المتبرع *</label>
-      <div class="custom-select" id="mon-edit-donor-box">
-        <input type="text" id="mon-edit-donor-search" class="custom-select-input" placeholder="ابحث بالاسم أو الكود..." autocomplete="off">
-        <input type="hidden" id="mon-edit-donor-id">
-        <div class="custom-select-list" id="mon-edit-donor-list"></div>
-      </div>
-    </div>
+    <div class="form-group" style="margin-bottom:12px;"><label>🏠 المستفيد (اختياري)</label><select id="mon-edit-beneficiary"><option value="">-- بدون مستفيد --</option></select></div>
+    <div class="form-group" style="margin-bottom:12px;"><label>البيان</label><input type="text" id="mon-edit-desc"></div>
     <div class="form-group" style="margin-bottom:12px;"><label>المبلغ (جنيه) *</label><input type="number" id="mon-edit-amount" min="1"></div>
     <div class="form-group" style="margin-bottom:12px;"><label>تاريخ الاستحقاق *</label><input type="date" id="mon-edit-date"></div>
-    <div class="form-group" style="margin-bottom:12px;"><label>الصندوق *</label><select id="mon-edit-project"></select></div>
+    <div class="form-group" style="margin-bottom:12px;"><label>الصندوق اللي هيتسحب منه *</label><select id="mon-edit-project"></select></div>
     <div class="form-group" style="margin-bottom:14px;"><label>ملاحظات</label><input type="text" id="mon-edit-notes"></div>
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" onclick="closeModal('mon-edit-modal')">إلغاء</button>
@@ -1449,7 +1440,7 @@ function renderStatement(){
 }
 
 // ============================================================
-// 🔁 التبرعات الشهرية (التزامات متكررة بتاريخ استحقاق وصندوق)
+// 🔁 المصروفات الشهرية (مصروفات متكررة بتاريخ استحقاق وصندوق يُسحب منه)
 // ============================================================
 function mEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])); }
 function todayStr(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
@@ -1462,26 +1453,7 @@ function addMonthKeepDay(dateStr, anchorDay){
   const day=Math.min(anchorDay||a[2], last);
   return ny+'-'+String(nm).padStart(2,'0')+'-'+String(day).padStart(2,'0');
 }
-
-function initMonthlyPicker(prefix){
-  const input=document.getElementById(prefix+'-search'), hidden=document.getElementById(prefix+'-id'), list=document.getElementById(prefix+'-list'), box=document.getElementById(prefix+'-box');
-  if(!input||!hidden||!list||input.dataset.ready) return; input.dataset.ready='1';
-  const draw=()=>{
-    const f=input.value.trim().toLowerCase();
-    const items=db.donors.filter(d=>!f||(d.name+' '+d.code).toLowerCase().includes(f)).slice(0,60);
-    list.innerHTML = items.length ? '' : '<div class="custom-select-empty">لا يوجد متبرع بهذا الاسم</div>';
-    items.forEach(d=>{
-      const div=document.createElement('div'); div.className='custom-select-item'; div.textContent=d.name+' ('+d.code+')';
-      div.onclick=()=>{ input.value=d.name+' ('+d.code+')'; hidden.value=d.id; list.classList.remove('show'); };
-      list.appendChild(div);
-    });
-    list.classList.add('show');
-  };
-  input.addEventListener('input',()=>{ hidden.value=''; draw(); });
-  input.addEventListener('click',()=>{ input.select(); draw(); });
-  input.addEventListener('focus',draw);
-  document.addEventListener('click',e=>{ if(box && !box.contains(e.target)) list.classList.remove('show'); });
-}
+function monthlyLabel(m){ return getPrivacyDesc({type:'expense', desc:m.desc, beneficiaryId:m.beneficiaryId}) || '—'; }
 
 function fillMonthlyFundSelect(selId, selected){
   const sel=document.getElementById(selId); if(!sel) return;
@@ -1492,9 +1464,14 @@ function fillMonthlyFundSelect(selId, selected){
 
 function renderMonthlyPage(){
   if(!db.monthly) db.monthly=[];
-  initMonthlyPicker('mon-donor'); initMonthlyPicker('mon-edit-donor');
+  // ترحيل: أي سجل اتسجل بالنسخة القديمة باسم متبرع يتحول لبيان نصي بدل ما يتفقد
+  db.monthly.forEach(m=>{
+    if(m.donorId && !m.desc && !m.beneficiaryId){ const d=db.donors.find(x=>String(x.id)===String(m.donorId)); m.desc='مصروف شهري — '+(d?d.name:'غير معروف'); }
+    if('donorId' in m) delete m.donorId;
+  });
   const fundSel=document.getElementById('mon-project'); if(!fundSel) return;
   fillMonthlyFundSelect('mon-project', fundSel.value); // يحافظ على اختيارك لو وصل تحديث من Firebase وانتِ بتكتبي
+  populateBeneficiarySelect('mon-beneficiary');
   const dEl=document.getElementById('mon-date'); if(dEl && !dEl.value) dEl.value=todayStr();
 
   const today=dayNum(todayStr());
@@ -1504,19 +1481,18 @@ function renderMonthlyPage(){
   document.getElementById('monthly-due').textContent=list.filter(m=>dayNum(m.nextDate)<=today).length;
 
   const body=document.getElementById('monthly-body');
-  if(!list.length){ body.innerHTML='<tr><td colspan="5"><div class="empty"><div class="empty-icon">🔁</div><div class="empty-text">لا توجد تبرعات شهرية مسجلة</div></div></td></tr>'; return; }
+  if(!list.length){ body.innerHTML='<tr><td colspan="5"><div class="empty"><div class="empty-icon">🔁</div><div class="empty-text">لا توجد مصروفات شهرية مسجلة</div></div></td></tr>'; return; }
   body.innerHTML=list.map(m=>{
-    const donor=db.donors.find(d=>String(d.id)===String(m.donorId));
     const proj=db.projects.find(p=>String(p.id)===String(m.projectId));
     const diff=dayNum(m.nextDate)-today;
     const st = diff<0 ? '<span class="badge" style="background:#fdecea;color:#c0392b;">⚠️ متأخر '+(-diff)+' يوم</span>'
              : diff===0 ? '<span class="badge" style="background:#fff3cd;color:#856404;">📅 اليوم</span>'
              : '<span class="badge" style="background:#e8f5e9;color:#1a5c38;">بعد '+diff+' يوم</span>';
     return '<tr><td><strong>'+formatDate(m.nextDate)+'</strong><br>'+st+'</td>'
-      +'<td><strong>'+(donor?mEsc(donor.name):'متبرع محذوف')+'</strong><br><small style="color:#777;">'+(donor?mEsc(donor.code):'')+(m.notes?' — '+mEsc(m.notes):'')+'</small></td>'
-      +'<td class="balance-pos">'+m.amount.toLocaleString('ar-EG')+' ج</td>'
+      +'<td><strong>'+mEsc(monthlyLabel(m))+'</strong>'+(m.notes?'<br><small style="color:#777;">📝 '+mEsc(m.notes)+'</small>':'')+'</td>'
+      +'<td class="balance-neg">'+m.amount.toLocaleString('ar-EG')+' ج</td>'
       +'<td>'+(proj?mEsc(proj.name)+(proj.isPrivate?' 🔒':''):'صندوق محذوف')+'</td>'
-      +'<td style="display:flex;gap:4px;flex-wrap:wrap;"><button class="btn btn-success btn-sm" onclick="openPayMonthly('+m.id+')">✅ دفع</button>'
+      +'<td style="display:flex;gap:4px;flex-wrap:wrap;"><button class="btn btn-success btn-sm" onclick="openPayMonthly('+m.id+')">✅ صرف</button>'
       +'<button class="btn btn-warn btn-sm" style="padding:4px 8px;" onclick="openEditMonthly('+m.id+')">✏️</button>'
       +'<button class="btn btn-outline btn-sm" style="padding:4px 8px;" onclick="deleteMonthly('+m.id+')">🗑️</button></td></tr>';
   }).join('');
@@ -1524,58 +1500,65 @@ function renderMonthlyPage(){
 
 async function saveMonthly(){
   if(!db.monthly) db.monthly=[];
-  const donorId=document.getElementById('mon-donor-id').value;
+  const benVal=document.getElementById('mon-beneficiary').value, beneficiaryId=benVal?parseInt(benVal):null;
+  const desc=document.getElementById('mon-desc').value.trim();
   const amount=parseFloat(document.getElementById('mon-amount').value||'0');
   const date=document.getElementById('mon-date').value;
   const projectId=document.getElementById('mon-project').value;
   const notes=document.getElementById('mon-notes').value.trim();
-  if(!donorId) return toast('⚠️ اختر المتبرع من القائمة','error');
+  if(!beneficiaryId && !desc) return toast('⚠️ أدخل البيان أو اختر مستفيداً','error');
   if(!amount||amount<=0) return toast('⚠️ أدخل مبلغاً صحيحاً','error');
   if(!date) return toast('⚠️ أدخل تاريخ الاستحقاق','error');
   if(!projectId) return toast('⚠️ اختر الصندوق','error');
-  db.monthly.push({id:Date.now(), donorId:parseInt(donorId), amount, nextDate:date, anchorDay:parseInt(date.split('-')[2],10), projectId:parseInt(projectId), notes, createdAt:new Date().toISOString()});
-  document.getElementById('mon-donor-search').value=''; document.getElementById('mon-donor-id').value='';
+  db.monthly.push({id:Date.now(), beneficiaryId, desc, amount, nextDate:date, anchorDay:parseInt(date.split('-')[2],10), projectId:parseInt(projectId), notes, createdAt:new Date().toISOString()});
+  document.getElementById('mon-beneficiary').value=''; document.getElementById('mon-desc').value='';
   document.getElementById('mon-amount').value=''; document.getElementById('mon-notes').value=''; document.getElementById('mon-date').value=todayStr();
-  await saveDB(); toast('✅ تمت إضافة التبرع الشهري','success');
+  await saveDB(); toast('✅ تمت إضافة المصروف الشهري','success');
+}
+
+function updateMonPayBalance(){
+  const box=document.getElementById('mon-pay-balance'); if(!box) return;
+  const pid=parseInt(document.getElementById('mon-pay-project').value); if(!pid){ box.innerHTML=''; return; }
+  const bal=getProjectBalance(pid), amt=parseFloat(document.getElementById('mon-pay-amount').value||'0');
+  box.innerHTML = amt>bal ? '<span style="color:#c0392b;">⚠️ رصيد الصندوق الحالي '+bal.toLocaleString('ar-EG')+' ج — أقل من المبلغ</span>'
+                          : '<span style="color:#5a7a5a;">💰 رصيد الصندوق الحالي: '+bal.toLocaleString('ar-EG')+' ج</span>';
 }
 
 function openPayMonthly(id){
   const m=(db.monthly||[]).find(x=>x.id===id); if(!m) return;
-  const donor=db.donors.find(d=>String(d.id)===String(m.donorId));
   document.getElementById('mon-pay-id').value=id;
-  document.getElementById('mon-pay-info').innerHTML='<strong>'+(donor?mEsc(donor.name)+' ('+mEsc(donor.code)+')':'متبرع محذوف')+'</strong><br>الاستحقاق الحالي: '+formatDate(m.nextDate)+' ← بعد الدفع: <strong>'+formatDate(addMonthKeepDay(m.nextDate,m.anchorDay))+'</strong>';
+  document.getElementById('mon-pay-info').innerHTML='<strong>'+mEsc(monthlyLabel(m))+'</strong><br>الاستحقاق الحالي: '+formatDate(m.nextDate)+' ← بعد الصرف: <strong>'+formatDate(addMonthKeepDay(m.nextDate,m.anchorDay))+'</strong>';
   document.getElementById('mon-pay-amount').value=m.amount;
   document.getElementById('mon-pay-date').value=todayStr();
   fillMonthlyFundSelect('mon-pay-project', m.projectId);
+  updateMonPayBalance();
   document.getElementById('mon-pay-modal').classList.add('open');
 }
 
 async function confirmPayMonthly(){
   const id=parseInt(document.getElementById('mon-pay-id').value);
-  const m=(db.monthly||[]).find(x=>x.id===id); if(!m) return toast('⚠️ لم يُعثر على التبرع الشهري','error');
+  const m=(db.monthly||[]).find(x=>x.id===id); if(!m) return toast('⚠️ لم يُعثر على المصروف الشهري','error');
   const amount=parseFloat(document.getElementById('mon-pay-amount').value||'0');
   const date=document.getElementById('mon-pay-date').value;
   const projectId=parseInt(document.getElementById('mon-pay-project').value);
   if(!amount||amount<=0) return toast('⚠️ أدخل مبلغاً صحيحاً','error');
-  if(!date) return toast('⚠️ أدخل تاريخ الدفع','error');
+  if(!date) return toast('⚠️ أدخل تاريخ الصرف','error');
   const project=db.projects.find(p=>p.id===projectId); if(!project) return toast('⚠️ اختر الصندوق','error');
-  const donor=db.donors.find(d=>String(d.id)===String(m.donorId));
-  if(!donor) return toast('⚠️ هذا المتبرع محذوف من النظام، عدّلي التبرع الشهري أولاً','error');
-  // حركة تبرع عادية بنفس شكل saveDonation — تظهر في كشف الحساب والتقارير
-  const tx={id:Date.now(), type:'donation', projectId:project.id, donorId:donor.id, amount, date, notes:'', desc:'مساهمة'};
+  if(monthlyLabel(m)==='—') return toast('⚠️ المصروف بدون بيان أو مستفيد، عدّليه أولاً','error');
+  // حركة مصروف عادية بنفس شكل saveExpense — تظهر في كشف الحساب والتقارير وتقرير المستفيد
+  const tx={id:Date.now(), type:'expense', projectId:project.id, amount, date, notes:m.notes||'', desc:m.desc||'', beneficiaryId:m.beneficiaryId||null};
   db.transactions.push(tx);
-  m.nextDate=addMonthKeepDay(m.nextDate, m.anchorDay); // نزول الصف لمكانه الجديد بعد الترتيب
+  m.nextDate=addMonthKeepDay(m.nextDate, m.anchorDay); // الصف ينزل لمكانه الجديد بعد الترتيب
   closeModal('mon-pay-modal');
-  await saveDB(); toast('✅ تم تسجيل الدفعة — الاستحقاق القادم '+formatDate(m.nextDate),'success');
-  setTimeout(()=>showWhatsAppModal(donor, amount, date, project, tx.id), 300);
+  await saveDB(); toast('✅ تم تسجيل المصروف — الاستحقاق القادم '+formatDate(m.nextDate),'success');
 }
 
 function openEditMonthly(id){
   const m=(db.monthly||[]).find(x=>x.id===id); if(!m) return;
-  const donor=db.donors.find(d=>String(d.id)===String(m.donorId));
   document.getElementById('mon-edit-id').value=id;
-  document.getElementById('mon-edit-donor-search').value = donor ? donor.name+' ('+donor.code+')' : '';
-  document.getElementById('mon-edit-donor-id').value = donor ? donor.id : '';
+  populateBeneficiarySelect('mon-edit-beneficiary');
+  document.getElementById('mon-edit-beneficiary').value=m.beneficiaryId||'';
+  document.getElementById('mon-edit-desc').value=m.desc||'';
   document.getElementById('mon-edit-amount').value=m.amount;
   document.getElementById('mon-edit-date').value=m.nextDate;
   document.getElementById('mon-edit-notes').value=m.notes||'';
@@ -1585,24 +1568,25 @@ function openEditMonthly(id){
 
 async function saveEditMonthly(){
   const id=parseInt(document.getElementById('mon-edit-id').value);
-  const m=(db.monthly||[]).find(x=>x.id===id); if(!m) return toast('⚠️ لم يُعثر على التبرع الشهري','error');
-  const donorId=document.getElementById('mon-edit-donor-id').value;
+  const m=(db.monthly||[]).find(x=>x.id===id); if(!m) return toast('⚠️ لم يُعثر على المصروف الشهري','error');
+  const benVal=document.getElementById('mon-edit-beneficiary').value, beneficiaryId=benVal?parseInt(benVal):null;
+  const desc=document.getElementById('mon-edit-desc').value.trim();
   const amount=parseFloat(document.getElementById('mon-edit-amount').value||'0');
   const date=document.getElementById('mon-edit-date').value;
   const projectId=document.getElementById('mon-edit-project').value;
-  if(!donorId) return toast('⚠️ اختر المتبرع من القائمة','error');
+  if(!beneficiaryId && !desc) return toast('⚠️ أدخل البيان أو اختر مستفيداً','error');
   if(!amount||amount<=0) return toast('⚠️ أدخل مبلغاً صحيحاً','error');
   if(!date) return toast('⚠️ أدخل تاريخ الاستحقاق','error');
   if(!projectId) return toast('⚠️ اختر الصندوق','error');
   if(date!==m.nextDate) m.anchorDay=parseInt(date.split('-')[2],10);
-  m.donorId=parseInt(donorId); m.amount=amount; m.nextDate=date; m.projectId=parseInt(projectId);
+  m.beneficiaryId=beneficiaryId; m.desc=desc; m.amount=amount; m.nextDate=date; m.projectId=parseInt(projectId);
   m.notes=document.getElementById('mon-edit-notes').value.trim();
   closeModal('mon-edit-modal');
   await saveDB(); toast('✅ تم حفظ التعديل','success');
 }
 
 async function deleteMonthly(id){
-  if(!confirm('حذف هذا التبرع الشهري من الجدول؟ (التبرعات المسجلة سابقاً في الصناديق لن تتأثر)')) return;
+  if(!confirm('حذف هذا المصروف الشهري من الجدول؟ (المصروفات المسجلة سابقاً في الصناديق لن تتأثر)')) return;
   db.monthly=(db.monthly||[]).filter(x=>x.id!==id);
   await saveDB(); toast('🗑️ تم الحذف','success');
 }
