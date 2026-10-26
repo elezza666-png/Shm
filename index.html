@@ -291,6 +291,21 @@
       <div id="stmt-body"><div class="empty" style="padding:60px 20px;"><div class="empty-icon">📄</div><div class="empty-text">اختر مشروعاً لعرض كشف حسابه</div></div></div>
     </div>
   </div>
+
+  <!-- آخر العمليات (كل الصناديق) -->
+  <div class="card" id="recent-ops-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div class="card-title" style="margin:0;">🕘 آخر العمليات <small id="recent-ops-count" style="color:var(--text-muted);font-weight:600;"></small></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-outline btn-sm recent-filter-btn" data-f="all" onclick="setRecentFilter('all')">🔄 الكل</button>
+        <button class="btn btn-outline btn-sm recent-filter-btn" data-f="donation" onclick="setRecentFilter('donation')">📥 تبرعات</button>
+        <button class="btn btn-outline btn-sm recent-filter-btn" data-f="expense" onclick="setRecentFilter('expense')">📤 مصروفات</button>
+      </div>
+    </div>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">مرتبة حسب وقت التسجيل (الأحدث أولاً) ومن كل الصناديق.</p>
+    <div id="recent-ops-list"></div>
+    <div id="recent-ops-more" style="text-align:center;margin-top:12px;"></div>
+  </div>
 </div>
 
 <!-- DONORS PAGE -->
@@ -1591,10 +1606,54 @@ async function deleteMonthly(id){
   await saveDB(); toast('🗑️ تم الحذف','success');
 }
 
+// ============================================================
+// 🕘 آخر العمليات — شاملة كل الصناديق (تبرعات + مصروفات) في الصفحة الرئيسية
+// ============================================================
+let recentOpsFilter='all', recentOpsLimit=20;
+function setRecentFilter(f){ recentOpsFilter=f; recentOpsLimit=20; renderRecentOps(); }
+function showMoreRecentOps(){ recentOpsLimit+=20; renderRecentOps(); }
+function renderRecentOps(){
+  const listEl=document.getElementById('recent-ops-list'); if(!listEl) return;
+  document.querySelectorAll('.recent-filter-btn').forEach(b=>{
+    const a=b.dataset.f===recentOpsFilter;
+    b.style.background=a?'#1a5c38':''; b.style.color=a?'#fff':''; b.style.borderColor=a?'#1a5c38':'';
+  });
+  const donorMap=new Map(db.donors.map(d=>[String(d.id),d]));
+  const projMap=new Map(db.projects.map(p=>[String(p.id),p]));
+  // الترتيب بوقت التسجيل (id = لحظة الإدخال) فتظهر العملية اللي لسه مسجلاها حتى لو بتاريخ قديم
+  const all=db.transactions.filter(t=>recentOpsFilter==='all'||t.type===recentOpsFilter)
+    .slice().sort((a,b)=>((b.id-a.id)||String(b.date).localeCompare(String(a.date))));
+  const shown=all.slice(0,recentOpsLimit);
+  document.getElementById('recent-ops-count').textContent = all.length ? '('+all.length+')' : '';
+  if(!shown.length){ listEl.innerHTML='<div class="empty" style="padding:30px 10px;"><div class="empty-icon">🕘</div><div class="empty-text">لا توجد عمليات بعد</div></div>'; document.getElementById('recent-ops-more').innerHTML=''; return; }
+  listEl.innerHTML=shown.map(t=>{
+    const isIn=t.type==='donation';
+    const proj=projMap.get(String(t.projectId));
+    let title;
+    if(isIn){
+      if(t.donorId==='general') title='🌟 '+(t.desc?mEsc(t.desc):'إيراد عام / فاعل خير');
+      else { const d=donorMap.get(String(t.donorId)); title=d?mEsc(d.name)+' <small style="color:#777;">('+mEsc(d.code)+')</small>':'متبرع محذوف'; }
+    } else {
+      title=mEsc(getPrivacyDesc(t)||'مصروف');
+    }
+    const projTxt=proj?mEsc(proj.name)+(proj.isPrivate?' 🔒':''):'صندوق محذوف';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);">'
+      +'<div style="display:flex;gap:10px;align-items:center;min-width:0;">'
+      +'<div style="font-size:22px;">'+(isIn?'📥':'📤')+'</div>'
+      +'<div style="min-width:0;"><div style="font-weight:700;overflow-wrap:anywhere;">'+title+'</div>'
+      +'<div style="font-size:12px;color:#777;overflow-wrap:anywhere;">'+projTxt+' · '+formatDate(t.date)+(t.notes?' · 📝 '+mEsc(t.notes):'')+'</div></div></div>'
+      +'<div style="font-weight:800;white-space:nowrap;color:'+(isIn?'#27ae60':'#c0392b')+';">'+(isIn?'+':'−')+t.amount.toLocaleString('ar-EG')+' ج</div></div>';
+  }).join('');
+  const more=document.getElementById('recent-ops-more');
+  more.innerHTML = all.length>shown.length
+    ? '<button class="btn btn-outline btn-sm" onclick="showMoreRecentOps()">⬇️ عرض المزيد ('+shown.length+' من '+all.length+')</button>' : '';
+}
+
 function renderAll() {
   renderDonorsTable();
   renderProjectsTable();
   renderHomePage();
+  renderRecentOps();
   populateBeneficiarySelect();
   if(selectedProject && document.getElementById('tab-statement').classList.contains('active')) renderStatement();
   if(document.getElementById('page-qard')?.classList.contains('active')) renderQardPage();
