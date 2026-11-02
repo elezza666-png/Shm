@@ -683,6 +683,7 @@
     <div style="margin-bottom:14px;"><label>المبلغ</label><input type="number" id="edit-tx-amount" min="1"></div>
     <div style="margin-bottom:14px;"><label>التاريخ</label><input type="date" id="edit-tx-date"></div>
     <div style="margin-bottom:14px;"><label>ملاحظات</label><input type="text" id="edit-tx-notes"></div>
+    <div class="form-group" style="margin-bottom:14px;"><label>📁 الصندوق <small style="color:var(--text-muted);">(غيّريه لو اتسجلت في صندوق غلط)</small></label><select id="edit-tx-project"></select></div>
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" onclick="closeModal('edit-tx-modal')">إلغاء</button>
       <button class="btn btn-primary" onclick="saveEditTx()">💾 حفظ التعديل</button>
@@ -1398,6 +1399,10 @@ function openEditTx(id) {
       document.getElementById('edit-tx-beneficiary').value = tx.beneficiaryId || '';
   }
   document.getElementById('edit-tx-donor').onchange = function() { document.getElementById('edit-tx-desc-wrapper').style.display = (this.value === 'general') ? 'flex' : 'none'; };
+  fillMonthlyFundSelect('edit-tx-project', tx.projectId);
+  if(!db.projects.some(p=>p.id===tx.projectId)){ // الصندوق الأصلي اتحذف: لازم تختاري صندوق بدل ما يتنقل لأول واحد بالغلط
+    const ps=document.getElementById('edit-tx-project'); ps.insertAdjacentHTML('afterbegin','<option value="">— الصندوق الأصلي محذوف، اختاري صندوقاً —</option>'); ps.value='';
+  }
   document.getElementById('edit-tx-modal').classList.add('open');
 }
 
@@ -1405,19 +1410,38 @@ async function saveEditTx() {
   const id = parseInt(document.getElementById('edit-tx-id').value); const tx = db.transactions.find(t=>t.id===id); if(!tx) return;
   const amount = parseFloat(document.getElementById('edit-tx-amount').value), date = document.getElementById('edit-tx-date').value, notes = document.getElementById('edit-tx-notes').value.trim();
   if(!amount || amount<=0 || !date) return toast('⚠️ مبلغ وتاريخ غير صحيح', 'error');
-  tx.amount = amount; tx.date = date; tx.notes = notes;
-  if(tx.type === 'donation') { 
-      const dId = document.getElementById('edit-tx-donor').value; if(!dId) return toast('⚠️ اختر المتبرع', 'error'); 
-      if(dId === 'general') { const desc = document.getElementById('edit-tx-desc').value.trim(); if(!desc) return toast('⚠️ أدخل البيان', 'error'); tx.donorId = 'general'; tx.desc = desc; } 
-      else { tx.donorId = parseInt(dId); tx.desc = 'مساهمة'; }
+
+  // الصندوق (ممكن يتغير لو العملية اتسجلت في صندوق غلط)
+  const pVal = document.getElementById('edit-tx-project').value;
+  let newProjectId = tx.projectId;
+  if(pVal){ newProjectId = parseInt(pVal); if(!db.projects.some(p=>p.id===newProjectId)) return toast('⚠️ الصندوق غير موجود', 'error'); }
+  else if(!db.projects.some(p=>p.id===tx.projectId)) return toast('⚠️ اختاري الصندوق', 'error');
+
+  // تحقق حسب النوع قبل ما نعدّل أي حاجة (عشان التعديل الفاشل ما يسيبش قيم نصف معدّلة)
+  let patch;
+  if(tx.type === 'donation') {
+      const dId = document.getElementById('edit-tx-donor').value; if(!dId) return toast('⚠️ اختر المتبرع', 'error');
+      if(dId === 'general') { const desc = document.getElementById('edit-tx-desc').value.trim(); if(!desc) return toast('⚠️ أدخل البيان', 'error'); patch = {donorId:'general', desc}; }
+      else patch = {donorId:parseInt(dId), desc:'مساهمة'};
   } else {
       const desc = document.getElementById('edit-tx-desc').value.trim();
       const benVal = document.getElementById('edit-tx-beneficiary').value;
       const beneficiaryId = benVal ? parseInt(benVal) : null;
       if(!desc && !beneficiaryId) return toast('⚠️ أدخل البيان أو اختر مستفيداً', 'error');
-      tx.desc = desc; tx.beneficiaryId = beneficiaryId;
+      patch = {desc, beneficiaryId};
   }
-  await saveDB(); closeModal('edit-tx-modal'); toast('✅ تم تعديل الحركة', 'success');
+
+  // كل التحققات نجحت — تطبيق التعديل
+  let movedTo = null;
+  if(newProjectId !== tx.projectId){
+    // عدّاد "الحركات الجديدة" للصندوق القديم: لو العملية كانت من اللي اتشاركت قبل كده، نصغّر نقطة الاحتساب عشان العدّاد ما يتأخرش
+    const oldProj = db.projects.find(p=>p.id===tx.projectId);
+    if(oldProj){ const idx = db.transactions.filter(t=>t.projectId===oldProj.id).indexOf(tx); if(idx>=0 && idx < (oldProj.lastSharedTxnCount||0)) oldProj.lastSharedTxnCount--; }
+    tx.projectId = newProjectId; movedTo = db.projects.find(p=>p.id===newProjectId);
+  }
+  tx.amount = amount; tx.date = date; tx.notes = notes; Object.assign(tx, patch);
+  await saveDB(); closeModal('edit-tx-modal');
+  toast(movedTo ? '✅ تم نقل الحركة إلى «'+movedTo.name+'»' : '✅ تم تعديل الحركة', 'success');
 }
 
 async function deleteTx(id) { if(!confirm('حذف هذه الحركة نهائياً؟')) return; db.transactions = db.transactions.filter(t => t.id != id); await saveDB(); toast('🗑️ تم الحذف', 'success'); }
@@ -1642,7 +1666,8 @@ function renderRecentOps(){
       +'<div style="font-size:22px;">'+(isIn?'📥':'📤')+'</div>'
       +'<div style="min-width:0;"><div style="font-weight:700;overflow-wrap:anywhere;">'+title+'</div>'
       +'<div style="font-size:12px;color:#777;overflow-wrap:anywhere;">'+projTxt+' · '+formatDate(t.date)+(t.notes?' · 📝 '+mEsc(t.notes):'')+'</div></div></div>'
-      +'<div style="font-weight:800;white-space:nowrap;color:'+(isIn?'#27ae60':'#c0392b')+';">'+(isIn?'+':'−')+t.amount.toLocaleString('ar-EG')+' ج</div></div>';
+      +'<div style="display:flex;align-items:center;gap:8px;"><div style="font-weight:800;white-space:nowrap;color:'+(isIn?'#27ae60':'#c0392b')+';">'+(isIn?'+':'−')+t.amount.toLocaleString('ar-EG')+' ج</div>'
+      +'<button class="btn btn-warn btn-sm" style="padding:4px 8px;" title="تعديل / نقل لصندوق آخر" onclick="openEditTx('+t.id+')">✏️</button></div></div>';
   }).join('');
   const more=document.getElementById('recent-ops-more');
   more.innerHTML = all.length>shown.length
