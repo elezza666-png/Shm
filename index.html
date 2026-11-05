@@ -215,6 +215,8 @@
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn btn-primary btn-sm" onclick="generateSixMonthsReport()">🗓️ تقرير آخر 6 شهور</button>
         <button class="btn btn-info btn-sm" onclick="exportActiveProjectsImage()">📸 تقرير المشاريع الفعالة</button>
+        <button class="btn btn-info btn-sm" onclick="exportActiveProjectsNoAmountsImage()">📋 المشاريع الفعالة (بدون مبالغ)</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('more-reports-modal').classList.add('open')">📑 تقارير إضافية</button>
         <button class="btn btn-accent btn-sm" onclick="openDonorCardSearch()">💳 بطاقة مساهم</button>
         <button class="btn btn-primary btn-sm" onclick="generateTopDonorsReport()">🏆 أبطال التبرع</button>
         <button class="btn btn-warn btn-sm" onclick="generateGroupMessage(0)">📢 رسالة هذا الشهر</button>
@@ -517,6 +519,27 @@
         <tbody id="qard-loans-done-body"></tbody>
       </table>
     </div>
+  </div>
+</div>
+
+<!-- MORE REPORTS MODAL -->
+<div class="modal-overlay" id="more-reports-modal">
+  <div class="modal">
+    <div class="modal-title">📑 تقارير إضافية</div>
+    <div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:700;margin-bottom:4px;">📤 أوجه الصرف الشهري</div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">مصروفات الشهر مقسّمة على الصناديق مع إجمالي كل صندوق — مناسب للمشاركة مع الجروب (الصناديق الخاصة غير مضمّنة، والمستفيد يظهر حسب إعداد إظهار الاسم).</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" onclick="closeModal('more-reports-modal');exportExpensesBreakdownImage(0)">هذا الشهر</button>
+        <button class="btn btn-outline btn-sm" onclick="closeModal('more-reports-modal');exportExpensesBreakdownImage(1)">الشهر السابق</button>
+      </div>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px;">
+      <div style="font-weight:700;margin-bottom:4px;">🔔 قائمة المتابعة</div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">المتبرعون اللي انقطعت مساهماتهم أكتر من 3 شهور (بعد ما كانوا بيساهموا) — بالأكواد فقط، مقسّمين حسب مدة الانقطاع.</p>
+      <button class="btn btn-primary btn-sm" onclick="closeModal('more-reports-modal');exportLapsedDonorsImage()">عرض التقرير</button>
+    </div>
+    <div class="modal-actions"><button class="btn btn-outline btn-sm" onclick="closeModal('more-reports-modal')">إغلاق</button></div>
   </div>
 </div>
 
@@ -1672,6 +1695,153 @@ function renderRecentOps(){
   const more=document.getElementById('recent-ops-more');
   more.innerHTML = all.length>shown.length
     ? '<button class="btn btn-outline btn-sm" onclick="showMoreRecentOps()">⬇️ عرض المزيد ('+shown.length+' من '+all.length+')</button>' : '';
+}
+
+// ============================================================
+// 📑 تقارير جديدة — قراءة فقط (ما بتعدّل أي بيانات ولا بتلمس التقارير الحالية)
+// ============================================================
+function rptFit(ctx,text,maxW){ let t=String(text==null?'':text); if(ctx.measureText(t).width<=maxW) return t; while(t.length>1 && ctx.measureText(t+'…').width>maxW) t=t.slice(0,-1); return t+'…'; }
+function rptLines(ctx,text,maxW,maxLines){
+  const words=String(text||'').split(/\s+/).filter(Boolean); const all=[]; let cur='';
+  words.forEach(w=>{ const t=cur?cur+' '+w:w; if(!cur||ctx.measureText(t).width<=maxW) cur=t; else { all.push(cur); cur=w; } });
+  if(cur) all.push(cur);
+  if(all.length<=maxLines) return all.map(l=>rptFit(ctx,l,maxW));
+  const out=all.slice(0,maxLines); out[maxLines-1]=rptFit(ctx,out[maxLines-1]+' …',maxW); return out;
+}
+function rptHeader(ctx,W,hdrH,title,sub1,sub2){
+  const g=ctx.createLinearGradient(0,0,W,hdrH); g.addColorStop(0,'#0a2e1a'); g.addColorStop(1,'#2d8a56');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,hdrH);
+  ctx.textAlign='center'; ctx.fillStyle='white'; ctx.font='bold 44px Cairo,Arial'; ctx.fillText(title,W/2,84);
+  if(sub1){ ctx.fillStyle='#ffd166'; ctx.font='bold 20px Cairo,Arial'; ctx.fillText(sub1,W/2,128); }
+  if(sub2){ ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='16px Cairo,Arial'; ctx.fillText(sub2,W/2,160); }
+}
+function rptFooter(ctx,W,y){ ctx.textAlign='center'; ctx.fillStyle='#88a888'; ctx.font='bold 17px Cairo,Arial'; ctx.fillText('نظام إدارة التبرعات السحابي برو 🌿  —  جزاكم الله خيراً',W/2,y); }
+
+// 1) المشاريع الفعالة حالياً — بدون أي مبالغ (الصناديق الخاصة والمؤرشفة غير مضمّنة)
+function exportActiveProjectsNoAmountsImage(){
+  const projects=db.projects.filter(p=>!p.isArchived && !p.isPrivate);
+  if(!projects.length) return toast('⚠️ لا توجد مشاريع فعالة لعرضها','error');
+  const DPR=2, W=1100, HDR=200, M=60, GAP=16, PER_PAGE=8, FOOT=100;
+  const cvs=document.getElementById('export-canvas');
+  const mctx=cvs.getContext('2d'); mctx.font='17px Cairo,Arial';
+  const items=projects.map(p=>({name:p.name, lines:rptLines(mctx,(p.desc||'').trim(),W-M*2-230,2)}));
+  items.forEach(it=>{ it.h = it.lines.length ? 62+it.lines.length*26+14 : 84; });
+  const pages=[]; for(let i=0;i<items.length;i+=PER_PAGE) pages.push(items.slice(i,i+PER_PAGE));
+  const images=[], dateTxt=new Date().toLocaleDateString('ar-EG');
+  pages.forEach((pg,pi)=>{
+    const H=HDR+20+pg.reduce((s,it)=>s+it.h+GAP,0)+FOOT;
+    cvs.width=W*DPR; cvs.height=H*DPR; const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
+    ctx.fillStyle='#f0f4f0'; ctx.fillRect(0,0,W,H);
+    rptHeader(ctx,W,HDR,'المشاريع الفعالة حالياً','صناديق مفتوحة للمساهمة — تابعوها معنا 🌿', 'عدد المشاريع: '+projects.length+'  •  '+dateTxt+(pages.length>1?'  •  صفحة '+(pi+1)+' من '+pages.length:''));
+    let y=HDR+20;
+    pg.forEach(it=>{
+      ctx.shadowColor='rgba(0,0,0,0.08)'; ctx.shadowBlur=14; ctx.shadowOffsetY=6;
+      ctx.fillStyle='white'; roundRect(ctx,M,y,W-M*2,it.h,16); ctx.fill();
+      ctx.shadowColor='transparent'; ctx.shadowBlur=0; ctx.shadowOffsetY=0;
+      ctx.fillStyle='#1a5c38'; roundRect(ctx,W-M-8,y,8,it.h,{tl:0,tr:16,bl:0,br:16}); ctx.fill();
+      ctx.textAlign='right'; ctx.fillStyle='#0f3d25'; ctx.font='bold 28px Cairo,Arial';
+      ctx.fillText(rptFit(ctx,it.name,W-M*2-230), W-M-28, y+(it.lines.length?40:it.h/2+10));
+      ctx.fillStyle='#6b7f6b'; ctx.font='17px Cairo,Arial';
+      it.lines.forEach((ln,i)=>ctx.fillText(ln, W-M-28, y+72+i*26));
+      ctx.fillStyle='#e8f5e9'; roundRect(ctx,M+24,y+it.h/2-18,104,36,18); ctx.fill();
+      ctx.textAlign='center'; ctx.fillStyle='#1a5c38'; ctx.font='bold 18px Cairo,Arial'; ctx.fillText('فعال',M+24+52,y+it.h/2+6);
+      y+=it.h+GAP;
+    });
+    rptFooter(ctx,W,y+40);
+    images.push({url:cvs.toDataURL('image/png'), name:'المشاريع_الفعالة_بدون_مبالغ'+(pages.length>1?'_صفحة'+(pi+1):'')+'.png'});
+  });
+  openReportModal(images);
+}
+
+// 2) أوجه الصرف الشهري — مصروفات الشهر موزعة على الصناديق (غير الخاصة)
+function exportExpensesBreakdownImage(monthOffset){
+  const now=new Date(), d0=new Date(now.getFullYear(), now.getMonth()-(monthOffset||0), 1);
+  const yr=d0.getFullYear(), mo=d0.getMonth()+1, key=yr+'-'+String(mo).padStart(2,'0');
+  const pubProjects=db.projects.filter(p=>!p.isPrivate), pubIds=new Set(pubProjects.map(p=>p.id));
+  const txns=db.transactions.filter(t=>t.type==='expense'&&t.date&&t.date.startsWith(key)&&pubIds.has(t.projectId));
+  if(!txns.length) return toast('⚠️ لا توجد مصروفات مسجلة في شهر '+mo+'/'+yr,'error');
+  const groups=pubProjects.map(p=>({p, items:txns.filter(t=>t.projectId===p.id).sort((a,b)=>a.date.localeCompare(b.date)||(a.id-b.id))})).filter(g=>g.items.length);
+  const grand=txns.reduce((s,t)=>s+t.amount,0), fmt=n=>n.toLocaleString('ar-EG')+' ج';
+  const MAXH=1500, pages=[]; let cur=[], curH=0;
+  const newPage=()=>{ pages.push(cur); cur=[]; curH=0; };
+  groups.forEach(g=>{
+    const sub=g.items.reduce((s,t)=>s+t.amount,0);
+    if(curH+60+50>MAXH && cur.length) newPage();
+    cur.push({k:'h',name:g.p.name,total:sub,h:60}); curH+=60;
+    g.items.forEach(t=>{
+      if(curH+50>MAXH){ newPage(); cur.push({k:'h',name:g.p.name+' (تابع)',total:null,h:60}); curH+=60; }
+      cur.push({k:'l',t,h:50}); curH+=50;
+    });
+    cur.push({k:'gap',h:18}); curH+=18;
+  });
+  cur.push({k:'total',h:64}); curH+=64; pages.push(cur);
+
+  const DPR=2, W=1100, HDR=200, M=50, FOOT=90, cvs=document.getElementById('export-canvas'), images=[], dateTxt=new Date().toLocaleDateString('ar-EG');
+  pages.forEach((pg,pi)=>{
+    const H=HDR+24+pg.reduce((s,it)=>s+it.h,0)+FOOT;
+    cvs.width=W*DPR; cvs.height=H*DPR; const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
+    ctx.fillStyle='#f4f7f4'; ctx.fillRect(0,0,W,H);
+    rptHeader(ctx,W,HDR,'أوجه الصرف — شهر '+mo+'/'+yr,'إجمالي المصروفات: '+fmt(grand), 'عدد العمليات: '+txns.length+'  •  '+dateTxt+(pages.length>1?'  •  صفحة '+(pi+1)+' من '+pages.length:''));
+    let y=HDR+24, zi=0;
+    pg.forEach(it=>{
+      if(it.k==='h'){
+        ctx.fillStyle='#1a5c38'; roundRect(ctx,M,y,W-M*2,52,12); ctx.fill();
+        ctx.textAlign='right'; ctx.fillStyle='white'; ctx.font='bold 24px Cairo,Arial'; ctx.fillText(rptFit(ctx,it.name,W-M*2-260),W-M-20,y+34);
+        if(it.total!=null){ ctx.textAlign='left'; ctx.fillStyle='#ffd166'; ctx.font='bold 22px Cairo,Arial'; ctx.fillText(fmt(it.total),M+20,y+34); }
+        zi=0; y+=it.h;
+      } else if(it.k==='l'){
+        ctx.fillStyle=zi%2===0?'#ffffff':'#eef6f0'; ctx.fillRect(M,y,W-M*2,it.h);
+        ctx.textAlign='right'; ctx.fillStyle='#8a9a8a'; ctx.font='17px Cairo,Arial'; ctx.fillText(formatDate(it.t.date),W-M-16,y+32);
+        ctx.fillStyle='#0f3d25'; ctx.font='bold 19px Cairo,Arial'; ctx.fillText(rptFit(ctx,getPrivacyDesc(it.t)||'مصروف',664),W-M-16-125,y+32);
+        ctx.textAlign='left'; ctx.fillStyle='#c0392b'; ctx.font='bold 20px Cairo,Arial'; ctx.fillText(fmt(it.t.amount),M+16,y+32);
+        zi++; y+=it.h;
+      } else if(it.k==='gap'){ y+=it.h; }
+      else if(it.k==='total' && pi===pages.length-1){
+        ctx.fillStyle='#0f3d25'; roundRect(ctx,M,y+4,W-M*2,56,12); ctx.fill();
+        ctx.textAlign='right'; ctx.fillStyle='white'; ctx.font='bold 24px Cairo,Arial'; ctx.fillText('إجمالي مصروفات الشهر',W-M-20,y+40);
+        ctx.textAlign='left'; ctx.fillStyle='#ffd166'; ctx.font='bold 26px Cairo,Arial'; ctx.fillText(fmt(grand),M+20,y+40);
+        y+=it.h;
+      }
+    });
+    rptFooter(ctx,W,y+40);
+    images.push({url:cvs.toDataURL('image/png'), name:'أوجه_الصرف_'+mo+'-'+yr+(pages.length>1?'_صفحة'+(pi+1):'')+'.png'});
+  });
+  openReportModal(images);
+}
+
+// 3) قائمة المتابعة — متبرعون كانوا بيساهموا وانقطعوا أكتر من 3 شهور (الأكواد فقط)
+function exportLapsedDonorsImage(){
+  const now=Date.now(), cut=now-90*86400000, lapsed=[];
+  db.donors.filter(d=>!d.isArchived).forEach(d=>{
+    const dates=db.transactions.filter(t=>t.type==='donation'&&t.date&&String(t.donorId)===String(d.id)).map(t=>t.date);
+    if(!dates.length) return; // لسه ما ساهمش أبداً: مش "منقطع"
+    const lastMs=new Date(dates.reduce((m,x)=>x>m?x:m,'')).getTime();
+    if(lastMs<cut) lapsed.push({code:d.code, months:Math.floor((now-lastMs)/2592000000)});
+  });
+  if(!lapsed.length) return toast('🎉 كل المتبرعين نشطين خلال آخر 3 شهور','success');
+  lapsed.sort((a,b)=>a.months-b.months||String(a.code).localeCompare(String(b.code)));
+  const secs=[{title:'انقطعوا من 3 إلى 6 شهور',list:lapsed.filter(x=>x.months<6),bg:'#d68910'},{title:'انقطعوا أكثر من 6 شهور',list:lapsed.filter(x=>x.months>=6),bg:'#c0392b'}].filter(s=>s.list.length);
+  const DPR=2, W=1000, HDR=190, M=18, COLS=5, CELL_H=58;
+  const secH=s=>44+Math.ceil(s.list.length/COLS)*CELL_H+16;
+  const H=HDR+16+secs.reduce((s,x)=>s+secH(x)+14,0)+90;
+  const cvs=document.getElementById('export-canvas'); cvs.width=W*DPR; cvs.height=H*DPR; const ctx=cvs.getContext('2d'); ctx.scale(DPR,DPR);
+  ctx.fillStyle='#f0f5f1'; ctx.fillRect(0,0,W,H);
+  rptHeader(ctx,W,HDR,'قائمة المتابعة','متبرعون انقطعت مساهماتهم أكثر من 3 شهور — الأكواد فقط','العدد: '+lapsed.length+'  •  '+new Date().toLocaleDateString('ar-EG'));
+  let y=HDR+16;
+  secs.forEach(s=>{
+    ctx.fillStyle=s.bg; roundRect(ctx,M,y,W-M*2,44,{tl:12,tr:12,bl:0,br:0}); ctx.fill();
+    ctx.textAlign='right'; ctx.fillStyle='white'; ctx.font='bold 20px Cairo,Arial'; ctx.fillText(s.title+' ('+s.list.length+')',W-M-16,y+30);
+    const rows=Math.ceil(s.list.length/COLS), colW=(W-M*2)/COLS;
+    ctx.fillStyle='white'; roundRect(ctx,M,y+44,W-M*2,rows*CELL_H+16,{tl:0,tr:0,bl:12,br:12}); ctx.fill();
+    s.list.forEach((x,i)=>{
+      const col=i%COLS,row=Math.floor(i/COLS), cx=W-M-col*colW-colW/2, cy=y+44+8+row*CELL_H;
+      ctx.textAlign='center'; ctx.fillStyle='#0f3d25'; ctx.font='bold 19px Cairo,Arial'; ctx.fillText(x.code,cx,cy+24);
+      ctx.fillStyle='#8a9a8a'; ctx.font='14px Cairo,Arial'; ctx.fillText(x.months+' شهر',cx,cy+44);
+    });
+    y+=secH(s)+14;
+  });
+  rptFooter(ctx,W,y+36);
+  openReportModal([{url:cvs.toDataURL('image/png'), name:'قائمة_المتابعة.png'}]);
 }
 
 function renderAll() {
