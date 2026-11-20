@@ -1478,16 +1478,13 @@ function renderStatement(){
   
   let html=`<div class="stmt-container"><div class="stmt-header"><div class="stmt-project-name">${selectedProject.name}</div><div class="stmt-date-range">رصيد أول المدة: ${opening.toLocaleString('ar-EG')} ج</div></div><div class="stmt-summary"><div class="stmt-sum-cell"><div class="stmt-sum-label">📊 إجمالي الوارد</div><div class="stmt-sum-value stmt-in">${totalIn.toLocaleString('ar-EG')}</div></div><div class="stmt-sum-cell"><div class="stmt-sum-label">💸 إجمالي الصادر</div><div class="stmt-sum-value stmt-out">${totalOut.toLocaleString('ar-EG')}</div></div><div class="stmt-sum-cell"><div class="stmt-sum-label">💰 الرصيد الحالي</div><div class="stmt-sum-value ${balance>=0?'stmt-balance':'stmt-out'}">${balance.toLocaleString('ar-EG')}</div></div></div>`;
   if(txns.length){
-    // حساب الأرصدة المتراكمة من الأقدم للأحدث ثم عرضها بالعكس
-    let cumulativeBals = [];
+    // حساب الأرصدة المتراكمة بالترتيب الزمني (التاريخ ثم ترتيب الإدخال جوه اليوم الواحد)،
+    // ثم عرض نفس الترتيب بالعكس بالكامل (الأحدث فوق حتى جوه اليوم الواحد) فيبقى كل صف = الصف اللي تحته + حركته
     let tempBal = opening;
     const txnsAsc = [...txns].sort((a,b)=>new Date(a.date)-new Date(b.date));
-    txnsAsc.forEach(t=>{ const isIn=t.type==='donation'; if(isIn)tempBal+=t.amount; else tempBal-=t.amount; cumulativeBals.push({id:t.id, bal:tempBal}); });
-    const balMap = {};
-    cumulativeBals.forEach(x=>balMap[x.id]=x.bal);
-    const rows=txns.map(t=>{
+    const ascRows = txnsAsc.map(t=>{ tempBal += (t.type==='donation' ? t.amount : -t.amount); return {t, runBal: tempBal}; });
+    const rows=ascRows.reverse().map(({t, runBal})=>{
       const isIn=t.type==='donation';
-      const runBal = balMap[t.id] ?? 0;
       let displayDesc = getPrivacyDesc(t);
       return `<tr><td dir="ltr" style="text-align:right;">${formatDate(t.date)}</td><td style="font-weight:bold;">${displayDesc}${t.notes?'<br><small style="color:#777; font-weight:normal;">'+t.notes+'</small>':''}</td><td class="balance-pos">${isIn?t.amount.toLocaleString('ar-EG'):'-'}</td><td class="balance-neg">${!isIn?t.amount.toLocaleString('ar-EG'):'-'}</td><td style="font-weight:bold;">${runBal.toLocaleString('ar-EG')}</td>
       <td style="display:flex;gap:4px;flex-wrap:wrap;">
