@@ -342,7 +342,11 @@
   </div>
   <div class="card" style="padding:0;">
     <div style="padding:18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-        <div class="card-title" style="margin:0;">📋 قائمة المتبرعين</div>
+        <div class="card-title" id="donors-card-title" style="margin:0;">📋 قائمة المتبرعين</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button id="donors-archive-review-btn" class="btn btn-outline btn-sm" onclick="openArchiveReview()">🗄️ أرشفة المنقطعين</button>
+          <button id="donors-view-toggle" class="btn btn-outline btn-sm" style="display:none;" onclick="toggleDonorsView()">📂 عرض الأرشيف</button>
+        </div>
         <input type="text" id="donor-table-search" placeholder="🔍 ابحث بالاسم، الكود، الهاتف..." style="width: 100%; max-width: 300px;" oninput="filterDonorsTable()">
     </div>
     <div class="table-wrap" style="border:none;border-radius:0 0 16px 16px;border-top:1px solid var(--border);">
@@ -518,6 +522,19 @@
         <thead><tr><th>المقترض</th><th>القرض</th><th>المسدَّد</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
         <tbody id="qard-loans-done-body"></tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- ARCHIVE REVIEW MODAL -->
+<div class="modal-overlay" id="archive-review-modal">
+  <div class="modal">
+    <div class="modal-title">🗄️ أرشفة المتبرعين المنقطعين</div>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.8;">دول المتبرعين اللي عدّى عليهم 6 شهور أو أكتر من غير مساهمة. الأرشفة بتشيلهم من القائمة الأساسية ومن قائمة "لم تُسجَّل مساهمتهم" في رسالة الجروب وقائمة المتابعة، <strong>من غير ما تمسح أي بيانات أو مساهمات سابقة</strong>، وبيرجعوا تلقائياً لو سجّلتي لهم مساهمة جديدة. وتقدري ترجعيهم يدوي في أي وقت من الأرشيف.</p>
+    <div id="archive-review-body" style="max-height:48vh;overflow-y:auto;margin-bottom:12px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('archive-review-modal')">إلغاء</button>
+      <button id="archive-confirm-btn" class="btn btn-primary" onclick="safeClick(this, confirmArchiveSelected)">🗄️ أرشفة المحدد</button>
     </div>
   </div>
 </div>
@@ -1217,16 +1234,31 @@ function openDonorReport(donorId) {
     document.getElementById('donor-report-modal').classList.add('open');
 }
 
+let donorsView='active'; // 'active' | 'archived'
+function toggleDonorsView(){ donorsView = donorsView==='active' ? 'archived' : 'active'; renderDonorsTable(); }
 function renderDonorsTable(){
   const tbody = document.getElementById('donors-table-body');
-  if(!db.donors.length) { tbody.innerHTML='<tr><td colspan="5"><div class="empty">لا يوجد متبرعون</div></td></tr>'; return; }
-  const threeMonthsAgo = Date.now() - (90*86400000);
-  tbody.innerHTML = db.donors.map(d=>{
-    const donorTxns = db.transactions.filter(t=>t.type==='donation'&&String(t.donorId)===String(d.id)).sort((a,b)=>new Date(b.date)-new Date(a.date));
-    const lastDon = donorTxns[0];
-    const isInactive = !lastDon || new Date(lastDon.date).getTime() < threeMonthsAgo;
-    const inactiveBadge = isInactive ? `<br><span class="badge" style="background:#fdecea;color:#c0392b;margin-top:4px;display:inline-block;">⚠️ ${lastDon?'غايب من '+Math.floor((Date.now()-new Date(lastDon.date).getTime())/2592000000)+' شهر':'لم يتبرع بعد'}</span>` : '';
-    return `<tr><td><span class="badge badge-code">${d.code}</span></td><td><strong>${d.name}</strong><br><small style="color:#777;">${getGenderLabel(d.gender||'M')}</small>${inactiveBadge}</td><td dir="ltr">${d.phone || '-'}</td><td>${d.notes||'-'}</td><td style="display:flex;gap:4px;"><button class="btn btn-info btn-sm" style="padding:4px 8px;" onclick="openDonorReport(${d.id})" title="تقرير وتذكير المتبرع">📄</button><button class="btn btn-warn btn-sm" style="padding:4px 8px;" onclick="openEditDonor(${d.id})">✏️</button><button class="btn btn-outline btn-sm" style="padding:4px 8px;" onclick="deleteDonor(${d.id})">🗑️</button></td></tr>`;
+  const archivedCount = db.donors.filter(d=>d.isArchived).length;
+  if(donorsView==='archived' && !archivedCount) donorsView='active'; // الأرشيف اتفضّى → نرجع للقائمة الأساسية
+  const view=donorsView, now=Date.now(), threeMonthsAgo=now-90*86400000, lastMap=donorLastDateMap();
+  const title=document.getElementById('donors-card-title'), tgl=document.getElementById('donors-view-toggle'), rev=document.getElementById('donors-archive-review-btn');
+  if(title) title.textContent = view==='archived' ? '🗄️ أرشيف المتبرعين' : '📋 قائمة المتبرعين';
+  if(tgl){ tgl.style.display = archivedCount ? '' : 'none'; tgl.textContent = view==='archived' ? '⬅️ رجوع للمتبرعين الفعالين' : '📂 عرض الأرشيف ('+archivedCount+')'; }
+  if(rev){ const n=getArchiveCandidates().lapsed.length; rev.style.display = view==='archived' ? 'none' : ''; rev.textContent='🗄️ أرشفة المنقطعين'+(n?' ('+n+')':''); }
+  const list = db.donors.filter(d=> view==='archived' ? !!d.isArchived : !d.isArchived);
+  if(!list.length){ tbody.innerHTML='<tr><td colspan="5"><div class="empty">'+(view==='archived'?'الأرشيف فاضي':'لا يوجد متبرعون')+'</div></td></tr>'; }
+  else tbody.innerHTML = list.map(d=>{
+    const ld=lastMap.get(String(d.id));
+    let badge='', actions;
+    if(view==='archived'){
+      badge='<br><span class="badge" style="background:#eceff1;color:#546e7a;margin-top:4px;display:inline-block;">🗄️ مؤرشف'+(d.archivedAt?' منذ '+formatDate(d.archivedAt):'')+'</span> <small style="color:#777;">'+(ld?'آخر مساهمة: '+formatDate(ld):'لم يساهم')+'</small>';
+      actions='<button class="btn btn-info btn-sm" style="padding:4px 8px;" onclick="openDonorReport('+d.id+')" title="تقرير وتذكير المتبرع">📄</button><button class="btn btn-success btn-sm" style="padding:4px 8px;" onclick="restoreDonor('+d.id+')" title="استرجاع من الأرشيف">↩️ استرجاع</button><button class="btn btn-outline btn-sm" style="padding:4px 8px;" onclick="deleteDonor('+d.id+')">🗑️</button>';
+    } else {
+      const isInactive=!ld || new Date(ld).getTime()<threeMonthsAgo;
+      if(isInactive) badge='<br><span class="badge" style="background:#fdecea;color:#c0392b;margin-top:4px;display:inline-block;">⚠️ '+(ld?'غايب من '+Math.floor((now-new Date(ld).getTime())/2592000000)+' شهر':'لم يتبرع بعد')+'</span>';
+      actions='<button class="btn btn-info btn-sm" style="padding:4px 8px;" onclick="openDonorReport('+d.id+')" title="تقرير وتذكير المتبرع">📄</button><button class="btn btn-warn btn-sm" style="padding:4px 8px;" onclick="openEditDonor('+d.id+')">✏️</button><button class="btn btn-outline btn-sm" style="padding:4px 8px;" onclick="archiveDonor('+d.id+')" title="نقل للأرشيف">🗄️</button><button class="btn btn-outline btn-sm" style="padding:4px 8px;" onclick="deleteDonor('+d.id+')">🗑️</button>';
+    }
+    return '<tr><td><span class="badge badge-code">'+mEsc(d.code)+'</span></td><td><strong>'+mEsc(d.name)+'</strong><br><small style="color:#777;">'+getGenderLabel(d.gender||'M')+'</small>'+badge+'</td><td dir="ltr">'+mEsc(d.phone||'-')+'</td><td>'+mEsc(d.notes||'-')+'</td><td style="display:flex;gap:4px;flex-wrap:wrap;">'+actions+'</td></tr>';
   }).join('');
   if(!document.getElementById('new-donor-code').value) document.getElementById('new-donor-code').value = generateNextCode();
   filterDonorsTable();
@@ -1254,14 +1286,14 @@ function populateDonorSelect(elementId) {
     list.appendChild(genDiv);
     if(db.donors.length) {
         db.donors.forEach(d => {
-          const div = document.createElement('div'); div.className = 'custom-select-item'; div.textContent = `${d.name} (${d.code})`;
+          const div = document.createElement('div'); div.className = 'custom-select-item'; div.textContent = `${d.name} (${d.code})`+(d.isArchived?' 🗄️ مؤرشف':'');
           div.onclick = () => { document.getElementById('don-donor-search').value = `${d.name} (${d.code})`; document.getElementById('don-donor').value = d.id; document.getElementById('don-general-desc-wrapper').style.display = 'none'; showLastContributionInfo(d.id); list.classList.remove('show'); };
           list.appendChild(div);
         });
     }
   } else {
     const sel = document.getElementById(elementId); if(!sel) return; sel.innerHTML = '<option value="general">🌟 إيراد عام / فاعل خير</option>';
-    db.donors.forEach(d => sel.innerHTML+=`<option value="${d.id}">${d.name} (${d.code})</option>`);
+    db.donors.forEach(d => sel.innerHTML+=`<option value="${d.id}">${d.name} (${d.code})${d.isArchived?' 🗄️ مؤرشف':''}</option>`);
   }
 }
 document.getElementById('don-donor-search').addEventListener('input', function(e) {
@@ -1353,7 +1385,7 @@ function renderHomePage() {
   const _pvtHome = new Set(db.projects.filter(p=>p.isPrivate).map(p=>p.id));
   const totalDon = db.transactions.filter(t=>t.type==='donation'&&!_pvtHome.has(t.projectId)).reduce((s,t)=>s+t.amount,0);
   const publicActive = db.projects.filter(p=>!p.isArchived&&!p.isPrivate);
-  document.getElementById('sum-donors').textContent=db.donors.length; document.getElementById('sum-projects').textContent=publicActive.length; document.getElementById('sum-total').textContent=totalDon.toLocaleString('ar-EG');
+  document.getElementById('sum-donors').textContent=db.donors.filter(d=>!d.isArchived).length; document.getElementById('sum-projects').textContent=publicActive.length; document.getElementById('sum-total').textContent=totalDon.toLocaleString('ar-EG');
 }
 function selectProject(id) { selectedProject = db.projects.find(p=>p.id===id); document.getElementById('project-actions').style.display='block'; renderHomePage(); populateDonorSelect('don-donor'); document.getElementById('tab-donation').click(); setTimeout(()=>{ document.getElementById('project-actions').scrollIntoView({behavior:'smooth', block:'start'}); }, 50); }
 
@@ -1369,10 +1401,11 @@ async function saveDonation(){
       const donor = db.donors.find(d=>d.id===parseInt(donorId)); if(!donor) return; parsedDonorId = donor.id; finalDesc = 'مساهمة'; 
   }
   const tx = {id:Date.now(), type:'donation', projectId:selectedProject.id, donorId: parsedDonorId, amount, date, notes, desc: finalDesc};
+  const revived = parsedDonorId !== 'general' ? reviveDonorIfArchived(parsedDonorId) : false;
   db.transactions.push(tx); await saveDB();
   
   document.getElementById('don-amount').value=''; document.getElementById('don-notes').value=''; document.getElementById('don-general-desc').value=''; document.getElementById('don-general-desc-wrapper').style.display='none';
-  document.getElementById('don-donor-search').value = ''; document.getElementById('don-donor').value = ''; document.getElementById('don-date').value = new Date().toISOString().split('T')[0]; toast('✅ تم التسجيل','success');
+  document.getElementById('don-donor-search').value = ''; document.getElementById('don-donor').value = ''; document.getElementById('don-date').value = new Date().toISOString().split('T')[0]; toast(revived ? '✅ تم التسجيل — والمتبرع رجع من الأرشيف ↩️' : '✅ تم التسجيل','success');
   document.getElementById('don-last-contribution').style.display='none';
   if(parsedDonorId !== 'general') { 
     const donor = db.donors.find(d=>d.id===parsedDonorId); 
@@ -1462,6 +1495,7 @@ async function saveEditTx() {
     if(oldProj){ const idx = db.transactions.filter(t=>t.projectId===oldProj.id).indexOf(tx); if(idx>=0 && idx < (oldProj.lastSharedTxnCount||0)) oldProj.lastSharedTxnCount--; }
     tx.projectId = newProjectId; movedTo = db.projects.find(p=>p.id===newProjectId);
   }
+  if(patch.donorId && patch.donorId!=='general') reviveDonorIfArchived(patch.donorId);
   tx.amount = amount; tx.date = date; tx.notes = notes; Object.assign(tx, patch);
   await saveDB(); closeModal('edit-tx-modal');
   toast(movedTo ? '✅ تم نقل الحركة إلى «'+movedTo.name+'»' : '✅ تم تعديل الحركة', 'success');
@@ -1839,6 +1873,81 @@ function exportLapsedDonorsImage(){
   });
   rptFooter(ctx,W,y+36);
   openReportModal([{url:cvs.toDataURL('image/png'), name:'قائمة_المتابعة.png'}]);
+}
+
+// ============================================================
+// 🗄️ أرشفة المتبرعين المنقطعين (6 شهور أو أكتر)
+// بعلامة isArchived + archivedAt جوه سجل المتبرع نفسه — قابلة للاسترجاع، ومفيش أي حذف لبيانات أو مساهمات
+// ============================================================
+const ARCHIVE_AFTER_MONTHS = 6;
+function donorLastDateMap(){ // آخر تاريخ مساهمة لكل متبرع (ما عدا الإيراد العام) في مرور واحد
+  const m=new Map();
+  db.transactions.forEach(t=>{ if(t.type==='donation' && t.donorId!=='general' && t.date){ const k=String(t.donorId); if(!m.has(k) || t.date>m.get(k)) m.set(k,t.date); } });
+  return m;
+}
+function getArchiveCandidates(){
+  const now=Date.now(), last=donorLastDateMap(), lapsed=[], never=[];
+  db.donors.forEach(d=>{
+    if(d.isArchived) return;
+    const ld=last.get(String(d.id));
+    if(ld){
+      const months=Math.floor((now-new Date(ld).getTime())/2592000000);
+      if(months>=ARCHIVE_AFTER_MONTHS) lapsed.push({d, last:ld, months});
+    } else {
+      // لسه ما ساهمش: ندخله بس لو عارفين تاريخ تسجيله وعدّى عليه 6 شهور أو أكتر
+      const reg = d.createdAt ? new Date(d.createdAt).getTime() : (d.id>1e12 ? d.id : NaN);
+      const months=Math.floor((now-reg)/2592000000);
+      if(months>=ARCHIVE_AFTER_MONTHS) never.push({d, reg:new Date(reg).toISOString().slice(0,10), months});
+    }
+  });
+  lapsed.sort((a,b)=>b.months-a.months || String(a.d.code).localeCompare(String(b.d.code)));
+  never.sort((a,b)=>b.months-a.months || String(a.d.code).localeCompare(String(b.d.code)));
+  return {lapsed, never};
+}
+function openArchiveReview(){
+  const {lapsed,never}=getArchiveCandidates();
+  if(!lapsed.length && !never.length) return toast('🎉 مفيش متبرعين منقطعين '+ARCHIVE_AFTER_MONTHS+' شهور أو أكتر','success');
+  const row=(x,group,checked,info)=>'<label style="display:flex;align-items:center;gap:10px;padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer;">'
+    +'<input type="checkbox" class="arc-chk" data-group="'+group+'" data-id="'+x.d.id+'" '+(checked?'checked':'')+' onchange="updateArchiveCount()" style="width:18px;height:18px;flex:none;">'
+    +'<span class="badge badge-code">'+mEsc(x.d.code)+'</span><span style="flex:1;min-width:0;"><strong>'+mEsc(x.d.name)+'</strong><br><small style="color:#777;">'+info+'</small></span></label>';
+  const sec=(title,list,group,checked,infoFn)=> !list.length ? '' :
+    '<div style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;"><strong>'+title+' ('+list.length+')</strong>'
+    +'<span style="display:flex;gap:6px;"><button class="btn btn-outline btn-sm" style="padding:2px 8px;" onclick="archiveSelectAll(\''+group+'\',true)">تحديد الكل</button><button class="btn btn-outline btn-sm" style="padding:2px 8px;" onclick="archiveSelectAll(\''+group+'\',false)">إلغاء التحديد</button></span></div>'
+    +list.map(x=>row(x,group,checked,infoFn(x))).join('')+'</div>';
+  document.getElementById('archive-review-body').innerHTML =
+      sec('انقطعوا '+ARCHIVE_AFTER_MONTHS+' شهور أو أكتر',lapsed,'lapsed',true,x=>'آخر مساهمة: '+formatDate(x.last)+' (من '+x.months+' شهر)')
+     +sec('مسجّلين ولم يساهموا أبداً (من '+ARCHIVE_AFTER_MONTHS+' شهور أو أكتر)',never,'never',false,x=>'تاريخ التسجيل: '+formatDate(x.reg)+' (من '+x.months+' شهر) — مش محدد تلقائياً');
+  updateArchiveCount();
+  document.getElementById('archive-review-modal').classList.add('open');
+}
+function archiveSelectAll(group,on){ document.querySelectorAll('.arc-chk[data-group="'+group+'"]').forEach(c=>c.checked=on); updateArchiveCount(); }
+function updateArchiveCount(){
+  const n=document.querySelectorAll('.arc-chk:checked').length, b=document.getElementById('archive-confirm-btn');
+  if(b){ b.textContent='🗄️ أرشفة المحدد ('+n+')'; b.disabled=n===0; }
+}
+async function confirmArchiveSelected(){
+  const ids=[...document.querySelectorAll('.arc-chk:checked')].map(c=>parseInt(c.dataset.id));
+  if(!ids.length) return toast('⚠️ حددي متبرع واحد على الأقل','error');
+  if(!confirm('نقل '+ids.length+' متبرع للأرشيف؟\nمش هيتمسح منهم أي حاجة، وتقدري ترجعيهم في أي وقت.')) return;
+  const today=todayStr(); let n=0;
+  db.donors.forEach(d=>{ if(ids.includes(d.id) && !d.isArchived){ d.isArchived=true; d.archivedAt=today; n++; } });
+  closeModal('archive-review-modal');
+  await saveDB(); toast('🗄️ اتنقل '+n+' متبرع للأرشيف','success');
+}
+async function archiveDonor(id){
+  const d=db.donors.find(x=>x.id===id); if(!d||d.isArchived) return;
+  if(!confirm('نقل "'+d.name+'" ('+d.code+') للأرشيف؟\nمش هيتمسح منه أي حاجة، وتقدري ترجّعيه في أي وقت.')) return;
+  d.isArchived=true; d.archivedAt=todayStr(); await saveDB(); toast('🗄️ اتنقل للأرشيف','success');
+}
+async function restoreDonor(id){
+  const d=db.donors.find(x=>x.id===id); if(!d||!d.isArchived) return;
+  d.isArchived=false; delete d.archivedAt; await saveDB(); toast('↩️ اتسترجع من الأرشيف','success');
+}
+// لو متبرع مؤرشف اتسجلت له مساهمة جديدة → يرجع فعّال تلقائياً
+function reviveDonorIfArchived(donorId){
+  const d=db.donors.find(x=>String(x.id)===String(donorId));
+  if(d && d.isArchived){ d.isArchived=false; delete d.archivedAt; return true; }
+  return false;
 }
 
 function renderAll() {
